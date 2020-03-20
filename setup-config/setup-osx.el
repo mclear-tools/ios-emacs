@@ -1,11 +1,5 @@
 ;;; OSX Settings
 ;;;; Clipboad
-(use-package simpleclip
-  :ensure t
-  :disabled t
-  :defer 1
-  :config
-  (simpleclip-mode 1))
 
 ;; Integrate with MacOS clipboard
 (setq select-enable-clipboard t)
@@ -39,9 +33,6 @@
 
 ;;;; General Settings
 
-(setq IS-LINUX (eq system-type 'gnu/linux)
-      IS-MAC (eq system-type 'darwin))
-(when IS-MAC
   ;; make fonts look better with anti-aliasing
   (setq mac-allow-anti-aliasing t)
   ;; delete files by moving them to the trash
@@ -84,24 +75,8 @@
   ;; (global-set-key (kbd "s-Z") 'undo-tree-redo)
   (global-set-key (kbd "C-s-f") 'toggle-frame-fullscreen)
   ;; Emacs sometimes registers C-s-f as this weird keycode
-  (global-set-key (kbd "<C-s-268632070>") 'toggle-frame-fullscreen))
+  (global-set-key (kbd "<C-s-268632070>") 'toggle-frame-fullscreen)
 
-;;;; Reveal in Finder
-(use-package reveal-in-osx-finder
-  :ensure t
-  :defer 2)
-
-;;;; Get mac links from safari
-(use-package grab-mac-link
-  :ensure t
-  :defer 1)
-
-(with-eval-after-load 'org-mac-link
-  (defun org-mac-message-open (message-id)
-    "Visit the message with MESSAGE-ID.
-This will use the command `open' with the message URL."
-    (start-process (concat "open message:" message-id) nil
-                   "open" (concat "message://" (substring message-id 2) ""))))
 
 
 

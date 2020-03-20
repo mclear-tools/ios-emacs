@@ -280,11 +280,11 @@
 ;;;; Long Lines
 ;; Emacs has problems with reading files with long lines. This package helps with that
 ;; https://www.emacswiki.org/emacs?action=browse;oldid=OverLongLineMode;id=SoLong
-(eval-when-compile
-  (quelpa '(so-long :url "https://raw.githubusercontent.com/emacs-mirror/emacs/master/lisp/so-long.el" :fetcher url)))
-(use-package so-long
-  :defer 1
-  :config (global-so-long-mode 1))
+;; (eval-when-compile
+;;   (quelpa '(so-long :url "https://raw.githubusercontent.com/emacs-mirror/emacs/master/lisp/so-long.el" :fetcher url)))
+;; (use-package so-long
+;;   :defer 1
+;;   :config (global-so-long-mode 1))
 
 ;;;; Miscellaneous
 (use-package remember

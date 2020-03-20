@@ -18,10 +18,8 @@
     (find-alternate-file ".."))
   ;; Suppress the warning: `ls does not support --dired'.
   (setq dired-use-ls-dired nil)
-  ;; Using `insert-directory-program'
-  (setq ls-lisp-use-insert-directory-program t)
   ;; list directories first
-  (setq dired-listing-switches "-laFGh1v --group-directories-first"))
+  (setq dired-listing-switches "-al --group-directories-first"))
 
 ;; Like with ls, append "@" to file names if they're symlinks
 (setq dired-ls-F-marks-symlinks t)
@@ -94,6 +92,7 @@
 
 ;;;;  Peep Dired
 (use-package peep-dired
+  :disabled
   :ensure t
   :commands (peep-dired)
   :functions (peep-dired-kill-buffers-without-window)

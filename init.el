@@ -14,7 +14,7 @@
 (setq inhibit-splash-screen t)
 (setq inhibit-startup-message t)
 (setq initial-scratch-message "")
-(setq frame-inhibit-implied-resize t)
+(menu-bar-mode -1)
 
 ;; Quick start scratch buffer
 (setq initial-major-mode 'fundamental-mode)
@@ -117,6 +117,12 @@
 (setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t)))
 (push cpm-setup-dir load-path)
 
+(use-package exec-path-from-shell
+  :config
+  (exec-path-from-shell-initialize))
+
+(setq shell-file-name "/bin/zsh")
+
 ;;; Load Modules
 ;; Load all the setup modules
 
@@ -125,25 +131,25 @@
 (require 'setup-libraries)
 (require 'setup-keybindings)
 (require 'setup-evil)
-;; (require 'setup-settings)
-;; (require 'setup-dired)
-;; (require 'setup-ivy)
-;; (require 'setup-helm)
+(require 'setup-settings)
+(require 'setup-dired)
+(require 'setup-ivy)
+(require 'setup-helm)
 
 ;;;; Other Modules
-;; (require 'setup-ui)
-;; (require 'setup-functions-macros)
-;; (require 'setup-modeline)
-;; (require 'setup-theme)
-;; (require 'setup-osx)
-;; (require 'setup-windows)
-;; (require 'setup-navigation)
-;; (require 'setup-search)
-;; (require 'setup-vc)
+(require 'setup-ui)
+(require 'setup-functions-macros)
+(require 'setup-modeline)
+(require 'setup-theme)
+(require 'setup-osx)
+(require 'setup-windows)
+(require 'setup-navigation)
+(require 'setup-search)
+(require 'setup-vc)
 ;; (require 'setup-shell)
 ;; (require 'setup-org)
-;; (require 'setup-writing)
-;; (require 'setup-projects)
+(require 'setup-writing)
+(require 'setup-projects)
 ;; (require 'setup-programming)
 ;; (require 'setup-pdf)
 ;; (require 'setup-calendars)
@@ -193,15 +199,5 @@
 (message (format "Emacs ready in %.2f seconds with %d garbage collections."
                  (float-time
                   (time-subtract after-init-time before-init-time)) gcs-done))
-(custom-set-variables
- ;; custom-set-variables was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- '(package-selected-packages (quote (f s dash async use-package auto-compile))))
-(custom-set-faces
- ;; custom-set-faces was added by Custom.
- ;; If you edit it by hand, you could mess it up, so be careful.
- ;; Your init file should contain only one such instance.
- ;; If there is more than one, they won't work right.
- )
+(put 'dired-find-alternate-file 'disabled nil)
+(put 'erase-buffer 'disabled nil)
