@@ -1,77 +1,10 @@
+;; init.el  -*- lexical-binding: t; mode: emacs-lisp; coding:utf-8; fill-column: 80 -*-
 ;;; Commentary:
-;; Base init file to load config. Use "outshine-cycle-buffer" (<Tab> and <S-Tab>
+;; Base init file to load config. Use "bicycle-cycle" (<Tab> and <S-Tab>
 ;; in org style) to navigate through sections, and "imenu" to locate individual
 ;; use-package definition.
 
 ;;; Startup
-;;;; Check Errors
-;; Produce backtraces when errors occur
-(setq debug-on-error nil)
-
-;;;; Clean View
-;; Disable start-up screen
-(setq-default inhibit-startup-screen t)
-(setq inhibit-splash-screen t)
-(setq inhibit-startup-message t)
-(setq initial-scratch-message "")
-(menu-bar-mode -1)
-
-;; Quick start scratch buffer
-(setq initial-major-mode 'fundamental-mode)
-
-;; Bury the scratch buffer, don't kill it
-(defadvice kill-buffer (around kill-buffer-around-advice activate)
-  (let ((buffer-to-kill (ad-get-arg 0)))
-    (if (equal buffer-to-kill "*scratch*")
-        (bury-buffer)
-      ad-do-it)))
-
-;;; Use-Package Settings
-;; I tell use-package to always defer loading packages unless explicitly told
-;; otherwise. This speeds up initialization significantly as many packages are
-;; only loaded later when they are explicitly used. But it can also cause
-;; problems:
-;; https://github.com/jwiegley/use-package#loading-packages-in-sequence. I also
-;; put a lot of loading of packages off until after some number of seconds of idle. The
-;; latter means package loading stays out of my way if I'm doing, e.g., a quick
-;; restart-and-check of something in emacs.
-
-(setq use-package-always-defer t
-      use-package-verbose t
-      use-package-minimum-reported-time 0.01
-      use-package-enable-imenu-support t
-      use-package-always-ensure t)
-
-(setq package-archives '(("melpa" . "https://melpa.org/packages/")
-                         ;; ("gnu" . "https://elpa.gnu.org/packages/")
-                         ("org" . "https://orgmode.org/elpa/")
-                         ;;  https://github.com/emacs-china/emacswiki-elpa
-                         ("emacswiki" . "https://mirrors.tuna.tsinghua.edu.cn/elpa/emacswiki/")
-                         ))
-(require 'package)
-(package-initialize)
-(unless (package-installed-p 'use-package)
-  (package-refresh-contents)
-  (package-install 'use-package))
-(require 'use-package)
-
-
-;;;; Auto-compile
-;; Automatically byte-recompile changed elisp libraries
-(use-package auto-compile
-  :ensure t
-  :defer 1
-  :config
-  (setq auto-compile-display-buffer nil)
-  (setq auto-compile-mode-line-counter t)
-  (setq auto-compile-update-autoloads t)
-  (auto-compile-on-load-mode)
-  (auto-compile-on-save-mode))
-
-;;; Personal Information
-;; Give emacs some personal info
-(setq user-full-name "Colin McLear"
-      user-mail-address "mclear@fastmail.com")
 
 ;;;; Directory Variables
 ;;  We're going to define a number of directories that are used throughout this
@@ -81,23 +14,23 @@
   "The path to the emacs.d directory.")
 
 (defconst cpm-local-dir (concat cpm-emacs-dir ".local/")
-    "Root directory for local Emacs files. Use this as permanent
+  "Root directory for local Emacs files. Use this as permanent
   storage for files that are safe to share across systems (if
   this config is symlinked across several computers).")
 
 (defconst cpm-temp-dir (concat cpm-local-dir "temp/")
-    "Directory for non-essential file storage. Used by
+  "Directory for non-essential file storage. Used by
   `cpm-etc-dir' and `cpm-cache-dir'.")
 
 (defconst cpm-etc-dir (concat cpm-temp-dir "etc/")
-    "Directory for non-volatile storage. These are not deleted or
+  "Directory for non-volatile storage. These are not deleted or
   tampered with by emacs functions. Use this for dependencies
   like servers or config files that are stable (i.e. it should be
   unlikely that you need to delete them if something goes
   wrong).")
 
 (defconst cpm-cache-dir (concat cpm-temp-dir "cache/")
-    "Directory for volatile storage. Use this for transient files
+  "Directory for volatile storage. Use this for transient files
   that are generated on the fly like caches and temporary files.
   Anything that may need to be cleared if there are problems.")
 
@@ -107,21 +40,155 @@
 (defconst cpm-setup-dir (concat cpm-emacs-dir "setup-config/")
   "Where the setup-init files are stored.")
 
+;; dir for  natively compiled *.eln files
+;; https://github.com/jimeh/build-emacs-for-macos#configuration
+(when (boundp 'comp-eln-load-path)
+  (setcar comp-eln-load-path
+          (expand-file-name "cache/eln-cache/" cpm-cache-dir)))
+
+;;;; System Variables
+(defconst sys/macp
+  (eq system-type 'darwin)
+  "Are we running on a Mac system?")
+
+(defconst sys/mac-x-p
+  (and (display-graphic-p) sys/macp)
+  "Are we running under X on a Mac system?")
+
+;;;; Path Settings
+;; Directory paths
+(dolist (dir (list cpm-local-dir cpm-etc-dir cpm-cache-dir cpm-elisp-dir cpm-setup-dir))
+  (unless (file-directory-p dir)
+    (make-directory dir t)))
+
+;; Exec path -- Emacs won't know where to load things without this
+(defconst cpm-local-bin (concat (getenv "HOME") "/bin") "Local execs.")
+(defconst usr-local-bin "/usr/local/bin")
+(defconst usr-local-sbin "/usr/local/sbin")
+(setenv "PATH" (concat usr-local-bin ":" usr-local-sbin ":" (getenv "PATH") ":" cpm-local-bin))
+(setq exec-path (append exec-path (list cpm-local-bin usr-local-sbin usr-local-bin)))
+
+;;; Package Settings
+;; I tell use-package to always defer loading packages unless explicitly told
+;; otherwise. This speeds up initialization significantly as many packages are
+;; only loaded later when they are explicitly used. But it can also cause
+;; problems:
+;; https://github.com/jwiegley/use-package#loading-packages-in-sequence. I also
+;; put a lot of loading of packages off until after some number of seconds of idle. The
+;; latter means package loading stays out of my way if I'm doing, e.g., a quick
+;; restart-and-check of something in emacs.
+
+
 ;;;; Load Path
-;; We're going to set the load path ourselves so that we don't have to call
-;; `package-initialize` at runtime and incur a large performance hit. This
-;; load-path will actually be faster than the one created by
-;; `package-initialize` because it appends the elpa packages to the end of the
-;; load path. Otherwise any time a builtin package was required it would have to
-;; search all of third party paths first.
-(setq load-path (append load-path (directory-files package-user-dir t "^[^.]" t)))
-(push cpm-setup-dir load-path)
+;; Add config files to load-path
+(eval-and-compile
+  (progn
+    (push cpm-setup-dir load-path)))
 
-(use-package exec-path-from-shell
+
+;;;; Straight
+;; use straight.el to install all packages
+;; https://github.com/raxod502/straight.el
+;; Don't check packages on startup
+;; (setq straight-check-for-modifications nil)
+(setq straight-check-for-modifications '(check-on-save find-when-checking))
+;; set branch
+(setq straight-repository-branch "develop")
+;; set dir
+(setq straight-base-dir cpm-local-dir)
+;; use use-package
+(setq straight-use-package-by-default t)
+;; Check updates manually
+(setq straight-vc-git-auto-fast-forward nil)
+;; see https://github.com/raxod502/straight.el/issues/757
+(setq native-comp-deferred-compilation-deny-list nil)
+
+;; bootstrap straight
+(defvar bootstrap-version)
+(let ((bootstrap-file
+       (expand-file-name "straight/repos/straight.el/bootstrap.el" straight-base-dir))
+      (bootstrap-version 5))
+  (unless (file-exists-p bootstrap-file)
+    (with-current-buffer
+        (url-retrieve-synchronously
+         "https://raw.githubusercontent.com/raxod502/straight.el/develop/install.el"
+         'silent 'inhibit-cookies)
+      (goto-char (point-max))
+      (eval-print-last-sexp)))
+  (load bootstrap-file nil 'nomessage))
+
+;; use experimental straight commands
+(require 'straight-x)
+;; https://github.com/raxod502/straight.el#how-do-i-pin-package-versions-or-use-only-tagged-releases
+(autoload #'straight-x-freeze-versions "straight-x")
+;; package updates
+;; use this workflow?
+;; https://github.com/raxod502/straight.el/issues/354#issuecomment-465305063
+(autoload #'straight-x-pull-all "straight-x")
+;; async fetch
+(autoload #'straight-x-fetch-all "straight-x")
+
+;; ;; automatically update packages every week
+;; (run-at-time "10:00pm" 604800 'straight-x-pull-all)
+
+;;;; Use-Package
+;; install use package
+(straight-use-package 'use-package)
+;; settings
+(setq use-package-always-defer nil
+      use-package-verbose t
+      use-package-minimum-reported-time 0
+      use-package-enable-imenu-support t
+      use-package-always-ensure nil)
+
+;;;; Security
+;; Properly verify outgoing ssl connections.
+;; See https://glyph.twistedmatrix.com/2015/11/editor-malware.html
+
+(use-package gnutls
+  :straight nil
+  :defer 1
+  :init
+  (setq gnutls-verify-error t
+        gnutls-min-prime-bits 3072))
+;; (add-to-list 'gnutls-trustfiles "/usr/local/etc/libressl/cert.pem"))
+
+;; (setq gnutls-verify-error t
+;;       tls-checktrust gnutls-verify-error
+;;       tls-program (list "gnutls-cli --x509cafile %t -p %p %h"
+;;                         ;; compatibility fallbacks
+;;                         "gnutls-cli -p %p %h"
+;;                         "openssl s_client -connect %h:%p -no_ssl2 -no_ssl3 -ign_eof")
+;;       nsm-settings-file (expand-file-name "network-security.data" cpm-cache-dir))
+;; ;; https://debbugs.gnu.org/cgi/bugreport.cgi?bug=34341
+;; (setq gnutls-algorithm-priority "NORMAL:-VERS-TLS1.3")
+
+
+;;;; Benchmark Init
+(use-package benchmark-init
+  ;; demand when using
+  ;; :demand t
+  :defer t
   :config
-  (exec-path-from-shell-initialize))
+  ;; To disable collection of benchmark data after init is done.
+  (add-hook 'emacs-startup-hook 'benchmark-init/deactivate))
 
-(setq shell-file-name "/bin/zsh")
+;;;; Auto-compile
+;; Automatically byte-recompile changed elisp libraries
+(use-package auto-compile
+  :defer 1
+  :config
+  (setq auto-compile-display-buffer nil)
+  (setq auto-compile-mode-line-counter nil)
+  (setq auto-compile-use-mode-line nil)
+  (setq auto-compile-update-autoloads t)
+  (auto-compile-on-load-mode)
+  (auto-compile-on-save-mode))
+
+;;; Personal Information
+;; Give emacs some personal info
+(setq user-full-name "Colin McLear"
+      user-mail-address "mclear@fastmail.com")
 
 ;;; Load Modules
 ;; Load all the setup modules
@@ -130,50 +197,49 @@
 ;; These are the "can't live without" modules
 (require 'setup-libraries)
 (require 'setup-keybindings)
+(require 'setup-functions-macros)
 (require 'setup-evil)
 (require 'setup-settings)
 (require 'setup-dired)
-(require 'setup-ivy)
-(require 'setup-helm)
+(require 'setup-completion)
+(require 'setup-osx)
 
 ;;;; Other Modules
+(require 'setup-splash)
+(require 'setup-windows-buffers)
 (require 'setup-ui)
-(require 'setup-functions-macros)
-(require 'setup-modeline)
 (require 'setup-theme)
-(require 'setup-osx)
-(require 'setup-windows)
 (require 'setup-navigation)
 (require 'setup-search)
 (require 'setup-vc)
-;; (require 'setup-shell)
-;; (require 'setup-org)
+(require 'setup-shell)
+(require 'setup-org)
+;; (require 'setup-org-extensions)
 (require 'setup-writing)
 (require 'setup-projects)
-;; (require 'setup-programming)
+(require 'setup-programming)
 ;; (require 'setup-pdf)
 ;; (require 'setup-calendars)
-;; (require 'setup-completion)
-;; (require 'setup-dashboard)
-;; (require 'setup-posframe)
 ;; (require 'setup-testing)
+
 
 ;;; Config Helper Functions
 
 ;;;; Config Navigation
 ;; Function to navigate config files
-(defun cpm/find-files-setup-config-directory ()
-  "use counsel to find setup files"
-  (interactive)
-  (counsel-find-file cpm-setup-dir))
-;; (helm-find-files-1 cpm-setup-dir))
 
-;; Function to search config files
-(defun cpm/search-setup-config-files ()
-  "use counsel rg to search all config files"
+(defun cpm/find-files-setup-config-directory ()
+  "find setup files"
   (interactive)
-  (counsel-rg nil cpm-setup-dir))
-;; (helm-do-ag cpm-setup-dir))
+  (let ((default-directory cpm-setup-dir))
+    (call-interactively 'find-file)))
+
+;; Function to search in config files
+(defun cpm/search-setup-config-files ()
+  "async fuzzy search with ripgrep for all config files"
+  (interactive)
+  (affe-grep cpm-setup-dir))
+;; (consult-ripgrep cpm-setup-dir))
 
 ;; Load init file
 (defun cpm/load-init-file ()
@@ -181,23 +247,70 @@
   (interactive)
   (load-file (concat user-emacs-directory "init.el")))
 
+;;;; Outline Navigation
+;; Packages to help with navigating
+;; I used to use outshine.el but it was overkill -- these packages are much smaller/simpler
+
+(use-package outline
+  :straight (:type built-in)
+  :hook (prog-mode . outline-minor-mode)
+  :general
+  (:keymaps 'outline-minor-mode-map :states '(normal motion)
+   "<tab>" 'outline-cycle
+   "S-<tab>" 'outline-cycle-buffer)
+  (:keymaps 'outline-minor-mode-map :states '(normal motion)
+   "gh"    'outline-previous-visible-heading
+   "gj"    'outline-forward-same-level
+   "gk"    'outline-backward-same-level
+   "gl"    'outline-next-visible-heading
+   "gu"    'outline-up-heading
+   "M-j"   'outline-move-subtree-down
+   "M-k"   'outline-move-subtree-up
+   "M-h"   'outline-promote
+   "M-l"   'outline-demote)
+  :config
+  (add-hook 'emacs-lisp-mode-hook
+            (lambda ()
+              ;; prevent `outline-level' from being overwritten by `lispy'
+              (setq-local outline-level #'outline-level)
+              ;; setup heading regexp specific to `emacs-lisp-mode'
+              (setq-local outline-regexp ";;;\\(;* \\)")
+              ;; heading alist allows for subtree-like folding
+              (setq-local outline-heading-alist
+                          '((";;; " . 1)
+                            (";;;; " . 2)
+                            (";;;;; " . 3)
+                            (";;;;;; " . 4)
+                            (";;;;;;; " . 5))))))
+
+;; Make outline faces look better
+(use-package outline-minor-faces
+  :after outline
+  :config (add-hook 'outline-minor-mode-hook
+                    'outline-minor-faces-add-font-lock-keywords))
+
 ;;;; Byte Compile Config Files
 ;; https://emacsredux.com/blog/2013/06/25/boost-performance-by-leveraging-byte-compilation/
-(defun cpm/byte-compile-dotemacs ()
-  "Byte compile all files in the .emacs.d base directory"
-  (interactive)
-  (shell-command-to-string "trash ~/.emacs.d/*.elc && trash ~/.emacs.d/setup-config/*.elc")
-  (byte-recompile-directory user-emacs-directory 0 t))
-
 (defun cpm/delete-byte-compiled-files ()
   "Delete byte-compiled files"
   (interactive)
   (shell-command-to-string "trash ~/.emacs.d/*.elc && trash ~/.emacs.d/setup-config/*.elc"))
 
+(defun cpm/byte-compile-dotemacs ()
+  "Byte compile all files in the .emacs.d base directory"
+  (interactive)
+  (cpm/delete-byte-compiled-files)
+  (byte-recompile-directory user-emacs-directory 0 t))
 
-;; Startup time
-(message (format "Emacs ready in %.2f seconds with %d garbage collections."
-                 (float-time
-                  (time-subtract after-init-time before-init-time)) gcs-done))
-(put 'dired-find-alternate-file 'disabled nil)
-(put 'erase-buffer 'disabled nil)
+;;;; After Startup
+
+;; reset file-name-handler-alist
+(add-hook 'emacs-startup-hook (lambda ()
+                                (setq file-name-handler-alist cpm--file-name-handler-alist)
+                                ;; reset garbage collection
+                                (setq gc-cons-threshold 800000)
+                                ;; Startup time
+                                (message (format "Emacs ready in %.2f seconds with %d garbage collections."
+                                                 (float-time
+                                                  (time-subtract after-init-time before-init-time)) gcs-done)
+                                         (put 'narrow-to-page 'disabled nil))))

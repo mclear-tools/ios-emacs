@@ -1,5 +1,10 @@
 ;;; OSX Settings
 ;;;; Clipboad
+(use-package simpleclip
+  :disabled t
+  :defer 1
+  :config
+  (simpleclip-mode 1))
 
 ;; Integrate with MacOS clipboard
 (setq select-enable-clipboard t)
@@ -33,13 +38,28 @@
 
 ;;;; General Settings
 
+(setq IS-LINUX (eq system-type 'gnu/linux)
+      IS-MAC (eq system-type 'darwin))
+(when IS-MAC
   ;; make fonts look better with anti-aliasing
   (setq mac-allow-anti-aliasing t)
   ;; delete files by moving them to the trash
-  (setq delete-by-moving-to-trash t)
-  (setq trash-directory "~/.Trash")
+  (use-package osx-trash
+    :straight t
+    :hook (after-init . osx-trash-setup)
+    :config
+    (setq delete-by-moving-to-trash t))
 
-  ;; Make new frames when opening a new file with Emacs unless on scratch buffer
+  ;; this might also work NOTE: not tested!
+  ;; https://emacs.stackexchange.com/a/63342/11934
+  (defun cpm/system-move-file-to-trash (filename)
+    "Move file or directory named FILENAME to the trash."
+    (ns-do-applescript
+     (format
+      "tell application \"Finder\" to delete POSIX file \"%s\""
+      filename)))
+
+  ;; (Do not) make new frames when opening a new file with Emacs unless on scratch buffer
   (setq ns-pop-up-frames nil)
 
   ;; fullscreen (disable for non-space full screen)
@@ -58,16 +78,18 @@
   (global-set-key (kbd "<H-backspace>") 'delete-forward-char)
 
   ;; Keybindings
-  (global-set-key (kbd "s-q") 'save-buffers-kill-terminal)
+  (global-set-key (kbd "s-q") 'cpm/delete-frame-or-quit)
+  (global-set-key (kbd "H-q") 'cpm/kill-all-emacsen)
   (global-set-key (kbd "s-v") 'yank)
   (global-set-key (kbd "s-c") 'evil-yank)
   (global-set-key (kbd "s-a") 'mark-whole-buffer)
   (global-set-key (kbd "s-x") 'kill-region)
   (global-set-key (kbd "s-w") 'delete-window)
   (global-set-key (kbd "s-W") 'delete-frame)
-  (global-set-key (kbd "s-n") 'make-frame)
-  (global-set-key (kbd "s-N") 'nameframe-create-frame)
-  ;; (global-set-key (kbd "s-z") 'undo-tree-undo)
+  (global-set-key (kbd "s-n") 'eyebrowse-create-window-config)
+  (global-set-key (kbd "s-N") 'make-frame)
+  (global-set-key (kbd "s-z") 'evil-undo)
+  (global-set-key (kbd "s-Z") 'evil-redo)
   (global-set-key (kbd "s-s")
                   (lambda ()
                     (interactive)
@@ -75,9 +97,36 @@
   ;; (global-set-key (kbd "s-Z") 'undo-tree-redo)
   (global-set-key (kbd "C-s-f") 'toggle-frame-fullscreen)
   ;; Emacs sometimes registers C-s-f as this weird keycode
-  (global-set-key (kbd "<C-s-268632070>") 'toggle-frame-fullscreen)
+  (global-set-key (kbd "<C-s-268632070>") 'toggle-frame-fullscreen))
+
+;;;; Reveal in Finder
+(use-package reveal-in-osx-finder
+  :defer 2)
+
+;;;; Get mac links from safari
+(use-package grab-mac-link
+  :defer 1)
+
+(with-eval-after-load 'org-mac-link
+  (defun org-mac-message-open (message-id)
+    "Visit the message with MESSAGE-ID.
+This will use the command `open' with the message URL."
+    (start-process (concat "open message:" message-id) nil
+                   "open" (concat "message://" (substring message-id 2) ""))))
+
+;;;; Homebrew
+(use-package homebrew
+  :straight (homebrew :host github :repo "jdormit/homebrew.el")
+  :commands
+  (homebrew-install homebrew-upgrade homebrew-update homebrew-edit homebrew-info homebrew-package-info))
+
+;;;; Security Keychain
+;; Seehttps://www.reddit.com/r/emacs/comments/ew75ib/emacs_mu4e_and_mbsync_setup_for_fastmail_on_macos/fg23tcj?utm_source=share&utm_medium=web2x&context=3
+(eval-after-load 'auth-source
+  '(when (member window-system '(mac ns))
+     (add-to-list 'auth-sources 'macos-keychain-internet)
+     (add-to-list 'auth-sources 'macos-keychain-generic)))
 
 
-
-
+;;; End OSX Settings
 (provide 'setup-osx)

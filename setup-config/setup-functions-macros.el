@@ -1,13 +1,109 @@
 ;;; Useful Functions
 
+;;;; Delete Frame or Quit
+(defun cpm/delete-frame-or-quit ()
+  "Delete the selected frame.  If the last one, kill Emacs."
+  (interactive)
+  (condition-case nil (delete-frame) (error (save-buffers-kill-emacs))))
+
+;;;; Undo-Redo
+;; Copied from Emacs 28
+(when (version< emacs-version "28.0")
+  (defun undo-only (&optional arg)
+    "Undo some previous changes.
+Repeat this command to undo more changes. A numeric ARG serves as
+a repeat count. Contrary to `undo', this will not redo a previous
+undo."
+    (interactive "*p")
+    (let ((undo-no-redo t)) (undo arg)))
+
+  (defun undo--last-change-was-undo-p (undo-list)
+    (while (and (consp undo-list) (eq (car undo-list) nil))
+      (setq undo-list (cdr undo-list)))
+    (gethash undo-list undo-equiv-table))
+
+  (defun undo-redo (&optional arg)
+    "Undo the last ARG undos."
+    (interactive "*p")
+    (cond
+     ((not (undo--last-change-was-undo-p buffer-undo-list))
+      (user-error "No undo to undo"))
+     (t
+      (let* ((ul buffer-undo-list)
+             (new-ul
+              (let ((undo-in-progress t))
+                (while (and (consp ul) (eq (car ul) nil))
+                  (setq ul (cdr ul)))
+                (primitive-undo arg ul)))
+             (new-pul (undo--last-change-was-undo-p new-ul)))
+        (message "Redo%s" (if undo-in-region " in region" ""))
+        (setq this-command 'undo)
+        (setq pending-undo-list new-pul)
+        (setq buffer-undo-list new-ul))))))
+
+;;;; Make Temp Buffer
+(defun cpm/tmp-buffer()
+  "Make a temporary buffer and switch to it"
+  (interactive)
+  (switch-to-buffer (get-buffer-create (concat "tmp-" (format-time-string "%m.%dT%H.%M.%S"))))
+  (delete-other-windows))
+
+;;;; Mode line benchmark
+;; https://emacs.stackexchange.com/a/59221/11934
+(defmacro mode-line-benchmark-elapse-time (&rest forms)
+  "Return the time in seconds elapsed for execution of FORMS."
+  (declare (indent 0) (debug t))
+  (let ((t1 (make-symbol "t1")))
+    `
+    (let (,t1)
+      (setq ,t1 (current-time))
+      ,@forms
+      (float-time (time-since ,t1)))))
+
+(defun mode-line-benchmark ()
+  (interactive)
+  (let* ((value nil)
+         (repetitions 10000)
+         (wall-clock-time
+          (mode-line-benchmark-elapse-time
+           (dotimes (_ repetitions)
+             (setq value (format-mode-line mode-line-format)))))
+         (average-time (/ wall-clock-time repetitions)))
+    (message
+     "Time: %.10f per call, %.10f for %S calls: %S"
+     average-time wall-clock-time repetitions value)))
+;;;; Revert all buffers
+;;
+(defun cpm/revert-all-file-buffers ()
+  "Refresh all open file buffers without confirmation.
+Buffers in modified (not yet saved) state in emacs will not be reverted. They
+will be reverted though if they were modified outside emacs.
+Buffers visiting files which do not exist any more or are no longer readable
+will be killed."
+  (interactive)
+  (dolist (buf (buffer-list))
+    (let ((filename (buffer-file-name buf)))
+      ;; Revert only buffers containing files, which are not modified;
+      ;; do not try to revert non-file buffers like *Messages*.
+      (when (and filename
+                 (not (buffer-modified-p buf)))
+        (if (file-readable-p filename)
+            ;; If the file exists and is readable, revert the buffer.
+            (with-current-buffer buf
+              (revert-buffer :ignore-auto :noconfirm :preserve-modes))
+          ;; Otherwise, kill the buffer.
+          (let (kill-buffer-query-functions) ; No query done when killing buffer
+            (kill-buffer buf)
+            (message "Killed non-existing/unreadable file buffer: %s" filename))))))
+  (message "Finished reverting buffers containing unmodified files."))
 ;;;; Insert Weather
 ;; From [[https://www.baty.blog/2019/insert-weather-into-emacs-buffer][Jack Baty]] with some slight modifications for formatting. See also [[https://github.com/chubin/wttr.in][wttr.in]]. 
 (defun cpm/insert-weather ()
   (interactive)
   (let ((w (shell-command-to-string "curl -s 'wttr.in/?0qT'")))
     (insert (mapconcat (function (lambda (x) (format ": %s" x)))
-           (split-string w "\n")
-           "\n")))
+                       (split-string w "\n")
+                       "\n")))
   (newline))
 
 
@@ -50,7 +146,8 @@
   (interactive)
   (start-process "Emacs" nil
                  ;; (executable-find "/usr/local/bin/emacs")))
-                 (executable-find "/Applications/Emacs.app/Contents/MacOS/Emacs")))
+                 ;; (executable-find "/Applications/Emacs.app/Contents/MacOS/Emacs")))
+                 (executable-find "Emacs")))
 
 ;;;; Clipboard to/from Buffer
 ;; http://stackoverflow.com/a/10216338/4869
@@ -80,11 +177,11 @@
 (defun goto-init.el ()
   "Open init.el file"
   (interactive)
-  (find-file "~/.emacs.d/init.el"))
+  (find-file user-init-file))
 (defun goto-custom.el ()
   "Open custom.el file"
   (interactive)
-  (find-file "~/.emacs.d/custom.el"))
+  (find-file custom-file))
 (defun goto-config.org ()
   "Open config.org file"
   (interactive)
@@ -93,7 +190,7 @@
   "Load config "
   (interactive)
   ;; (cpm/tangle-emacs-config)
-  (load-file "~/.emacs.d/init.el"))
+  (load-file user-init-file))
 (defun goto-dotfiles.org ()
   "Open dotfiles.org file"
   (interactive)
@@ -101,7 +198,7 @@
 (defun goto-emacs-dir ()
   "Open dotfiles.org file"
   (interactive)
-  (find-file "~/.emacs.d"))
+  (find-file user-emacs-directory))
 (defun goto-cpm-elisp-dir ()
   (interactive)
   (find-file cpm-elisp-dir))
@@ -137,10 +234,10 @@
 ;;;; Useful Buffers
 (defun cpm/user-buffer-q ()
   "Return t if current buffer is a user buffer, else nil.
-Typically, if buffer name starts with *, it's not considered a user buffer.
-This function is used by buffer switching command and close buffer command, so that next buffer shown is a user buffer.
-You can override this function to get your idea of “user buffer”.
-version 2016-06-18"
+  Typically, if buffer name starts with *, it's not considered a user buffer.
+  This function is used by buffer switching command and close buffer command, so that next buffer shown is a user buffer.
+  You can override this function to get your idea of “user buffer”.
+  version 2016-06-18"
   (interactive)
   (if (string-equal "*" (substring (buffer-name) 0 1))
       nil
@@ -151,9 +248,9 @@ version 2016-06-18"
 
 (defun cpm/next-user-buffer ()
   "Switch to the next user buffer.
-“user buffer” is determined by `cpm/user-buffer-q'.
-URL `http://ergoemacs.org/emacs/elisp_next_prev_user_buffer.html'
-Version 2016-06-19"
+  “user buffer” is determined by `cpm/user-buffer-q'.
+  URL `http://ergoemacs.org/emacs/elisp_next_prev_user_buffer.html'
+  Version 2016-06-19"
   (interactive)
   (next-buffer)
   (let ((i 0))
@@ -165,9 +262,9 @@ Version 2016-06-19"
 
 (defun cpm/previous-user-buffer ()
   "Switch to the previous user buffer.
-“user buffer” is determined by `cpm/user-buffer-q'.
-URL `http://ergoemacs.org/emacs/elisp_next_prev_user_buffer.html'
-Version 2016-06-19"
+  “user buffer” is determined by `cpm/user-buffer-q'.
+  URL `http://ergoemacs.org/emacs/elisp_next_prev_user_buffer.html'
+  Version 2016-06-19"
   (interactive)
   (previous-buffer)
   (let ((i 0))
@@ -205,12 +302,12 @@ Version 2016-06-19"
 (with-eval-after-load 'ediff
   (defhydra hydra-ediff (:color blue :hint nil)
     "
-^Buffers           Files           VC                     Ediff regions
-----------------------------------------------------------------------
-_b_uffers           _f_iles (_=_)       _r_evisions              _l_inewise
-_B_uffers (3-way)   _F_iles (3-way)                          _w_ordwise
-                  _c_urrent file
-"
+  ^Buffers           Files           VC                     Ediff regions
+  ----------------------------------------------------------------------
+  _b_uffers           _f_iles (_=_)       _r_evisions              _l_inewise
+  _B_uffers (3-way)   _F_iles (3-way)                          _w_ordwise
+  _c_urrent file
+  "
     ("b" ediff-buffers)
     ("B" ediff-buffers3)
     ("=" ediff-files)
@@ -229,8 +326,8 @@ _B_uffers (3-way)   _F_iles (3-way)                          _w_ordwise
 
 (defun minibuffer-keyboard-quit ()
   "Abort recursive edit.
-In Delete Selection mode, if the mark is active, just deactivate it;
-then it takes a second \\[keyboard-quit] to abort the minibuffer."
+  In Delete Selection mode, if the mark is active, just deactivate it;
+  then it takes a second \\[keyboard-quit] to abort the minibuffer."
   (interactive)
   (if (and delete-selection-mode transient-mark-mode mark-active)
       (setq deactivate-mark  t)
@@ -258,12 +355,15 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 (defun cpm/fill-or-unfill ()
   "Like `fill-paragraph', but unfill if used twice."
   (interactive)
-  (let ((fill-column
-         (if (eq last-command 'cpm/fill-or-unfill)
-             (progn (setq this-command nil)
-                    (point-max))
-           fill-column)))
-    (call-interactively #'fill-paragraph)))
+  ;; if in an org buffer use org-fill-paragraph
+  (if (derived-mode-p 'org-mode)
+      (org-fill-paragraph)
+    (let ((fill-column
+           (if (eq last-command 'cpm/fill-or-unfill)
+               (progn (setq this-command nil)
+                      (point-max))
+             fill-column)))
+      (call-interactively #'fill-paragraph))))
 
 (global-set-key [remap fill-paragraph]
                 #'cpm/fill-or-unfill)
@@ -289,9 +389,9 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   (interactive)
   (cond
    ((eq major-mode 'org-mode)
-    (call-interactively 'counsel-org-goto))
+    (call-interactively 'consult-org-heading))
    (t
-    (call-interactively 'counsel-semantic-or-imenu))))
+    (call-interactively 'consult-outline))))
 
 ;;;; Resume
 ;; resume last jump
@@ -352,8 +452,8 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 ;;;; Narrow/Widen
 (defun cpm/narrow-or-widen-dwim (p)
   "Widen if buffer is narrowed, narrow-dwim otherwise.
-  Dwim means: region, org-src-block, org-subtree, or
-  defun, whichever applies first. Narrowing to
+  Dwim means: region, org-src-block, org-subtree, markdown
+  subtree, or defun, whichever applies first. Narrowing to
   org-src-block actually calls `org-edit-src-code'.
 
   With prefix P, don't widen, just narrow even if buffer
@@ -372,6 +472,8 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
                 (delete-other-windows))
                ((ignore-errors (org-narrow-to-block) t))
                (t (org-narrow-to-subtree))))
+        ((derived-mode-p 'markdown-mode)
+         (markdown-narrow-to-subtree))
         ((derived-mode-p 'latex-mode)
          (LaTeX-narrow-to-environment))
         (t (narrow-to-defun))))
@@ -426,17 +528,17 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   (if (org-at-table-p)
       (call-interactively 'org-table-rotate-recalc-marks)
     (let* ((choices '(
-                      ("a" . "ASCII")
-                      ("c" . "COMMENT")
-                      ("C" . "CENTER")
-                      ("e" . "EXAMPLE")
-                      ("E" . "SRC emacs-lisp")
-                      ("h" . "HTML")
-                      ("l" . "LaTeX")
-                      ("n" . "NOTES")
-                      ("q" . "QUOTE")
-                      ("s" . "SRC")
-                      ("v" . "VERSE")
+                      ("a" . "ascii")
+                      ("c" . "comment")
+                      ("C" . "center")
+                      ("e" . "example")
+                      ("E" . "src emacs-lisp")
+                      ("h" . "html")
+                      ("l" . "laTeX")
+                      ("n" . "notes")
+                      ("q" . "quote")
+                      ("s" . "src")
+                      ("v" . "verse")
                       ))
            (key
             (key-description
@@ -457,19 +559,31 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
               (let ((start (region-beginning))
                     (end (region-end)))
                 (goto-char end)
-                (insert "#+END_" choice "\n")
+                (insert "#+end_" choice "\n")
                 (goto-char start)
-                (insert "#+BEGIN_" choice "\n")))
+                (insert "#+begin_" choice "\n")))
              (t
-              (insert "#+BEGIN_" choice "\n")
-              (save-excursion (insert "#+END_" choice))))))))))
+              (insert "#+begin_" choice "\n")
+              (save-excursion (insert "#+end_" choice))))))))))
+
+
+;;;; Org Export Body to HTML Buffer
+(defun cpm/org-export-to-buffer-html-as-body (&optional async subtreep visible-only body-only ext-plist)
+  "Export org buffer body to html"
+  (interactive)
+  (org-export-to-buffer 'html "*Org HTML Export*"
+    async body-only ext-plist (lambda () (html-mode)))
+  (cpm/copy-whole-buffer-to-clipboard)
+  (delete-windows-on "*Org HTML Export*")
+  (message "HTML copied!"))
+;; (cpm/previous-user-buffer))
 
 
 ;;;; Clipboard Transforms Using Pandoc
 (defun cpm/org-to-markdown ()
   "convert clipboard contents from org to markdown and paste"
   (interactive)
-  (kill-new (shell-command-to-string "pbpaste | pandoc --atx-headers -f org -t markdown"))
+  (kill-new (shell-command-to-string "pbpaste | pandoc -f org -t markdown"))
   (yank))
 
 (defun cpm/markdown-to-org ()
@@ -520,29 +634,44 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   (kill-new (shell-command-to-string "pbpaste | pandoc-citeproc -y -f bibtex | pbcopy"))
   (yank))
 
-(defun cpm/org-to-rtf ()
+(defun cpm/md-to-rtf ()
+  "convert md to rtf and send to clipboard"
   (interactive)
-  (kill-new (shell-command-to-string "pbpaste | pandoc -s -f org -t rtf | pbcopy")))
+  (kill-new (shell-command-to-string "pbpaste | pandoc -f markdown -t rtf | pbcopy"))
+  (yank))
+
+
+;; NOTE: piping to pbcopy doesn't seem to work but it is ready to paste as is
+(defun cpm/org-to-rtf ()
+  "convert org to rtf and send to clipboard"
+  (interactive)
+  (kill-new (shell-command-to-string "pbpaste | pandoc -f org -t html | /usr/bin/textutil -stdin -stdout -format html -convert rtf -fontsize 14 -font Helvetica | pbcopy")))
 
 (defun cpm/org-to-mail-rtf ()
   "copy buffer, convert clipboard contents from org to rtf, and send to mail message"
   (interactive)
   (cpm/copy-whole-buffer-to-clipboard)
-  (kill-new (shell-command-to-string "pbpaste | pandoc -s -f org -t rtf"))
+  ;; (kill-new (shell-command-to-string "pbpaste | pandoc -f org -t rtf"))
+  (kill-new (shell-command-to-string "pbpaste | pandoc -f org -t html | /usr/bin/textutil -stdin -stdout -format html -convert rtf -fontsize 14 | pbcopy"))
   (kill-buffer)
   (delete-frame)
   (do-applescript "if application \"Mail\" is running then
-                   tell application \"Mail\"
-                   activate
-                   delay 0.35
-                   tell application \"System Events\"
-                   keystroke \"v\" using {command down}
-                   end tell
-                   end tell
-                   end if"))
+  tell application \"Mail\"
+  activate
+  delay 0.35
+  tell application \"System Events\"
+  keystroke \"v\" using {command down}
+  end tell
+  end tell
+  end if"))
 
 
-
+;;;; Mailmate save mail and kill client
+;; Save buffer and exit emacsclient for Mailmate
+(defun cpm/email-save-and-kill ()
+  (interactive)
+  (save-buffer)
+  (server-edit))
 ;;;; Helm Projectile
 (defun cpm/helm-projectile-find-file-other-window ()
   "Find a file in a project and open in a vertical split"
@@ -563,13 +692,6 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   (if default-directory
       (browse-url-of-file (expand-file-name default-directory))
     (error "No `default-directory' to open")))
-
-;;;; Send Reveal Slides to PDF
-(defun cpm/reveal-to-pdf ()
-  "print reveal.js slides to pdf"
-  (interactive)
-  (async-shell-command "phantomjs ~/bin/print-pdf.js 'file:///Users/roambot/Dropbox/Work/projects/phil105/phil105-classplan.html?print-pdf'")
-  (delete-windows-on "*Async Shell Command*" t))
 
 ;;;; Rotate Windows
 ;; from magnars modified by ffevotte for dedicated windows support
@@ -611,6 +733,7 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
 (defun cpm/helm-files-do-ag (&optional dir)
   "Search in files with `ag' using a default input."
   (interactive)
+  (require 'helm-ag)
   (helm-do-ag dir))
 
 ;;;; Make Window  a Frame
@@ -693,22 +816,6 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
  #'set-point-before-yanking-if-in-text-mode)
 ;; http://lists.gnu.org/archive/html/help-gnu-emacs/2007-05/msg00975.html
 
-;;;; Sticky Buffer
-;; Stick/Lock buffer to window, courtesy of ShingoFukuyama.
-;; https://gist.github.com/ShingoFukuyama/8797743
-
-(defvar sticky-buffer-previous-header-line-format)
-(define-minor-mode sticky-buffer-mode
-  "Make the current window always display this buffer."
-  nil " sticky" nil
-  (if sticky-buffer-mode
-      (progn
-        (set (make-local-variable 'sticky-buffer-previous-header-line-format)
-             header-line-format)
-        (set-window-dedicated-p (selected-window) sticky-buffer-mode))
-    (set-window-dedicated-p (selected-window) sticky-buffer-mode)
-    (setq header-line-format sticky-buffer-previous-header-line-format)))
-
 ;;;; Exchange Windows
 ;; Swap buffers in windows and leave the cursor in the original window. Courtesy of
 ;; Mike Zamansky's video.
@@ -790,6 +897,7 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   "Search file for any TODO markers as specified in hl-todo-keyword-faces. Note that this uses the word boundary \\b to avoid matching these within other words, but this means that non-word keywords such as ???, which is in the list by default, will not be matched."
   (interactive)
   (require 'projectile)
+  (require 'helm-ag)
   (let* ((grouped (funcall #'regexp-opt (--map (car it) hl-todo-keyword-faces)))
          (unescaped (s-replace-all '(("\\(" . "(") ("\\)" . ")") ("\\|" . "|"))
                                    grouped))
@@ -820,11 +928,13 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
     (insert "---" "\n")))
 
 
-;;;; Counsel search given directory
-(defun cpm/counsel-search-in-input-dir ()
-  "Grep for a string in the input directory using counsel"
+;;;; Search given directory
+(defun cpm/search-in-input-dir ()
+  "Grep for a string in the input directory using completing read function"
   (interactive)
-  (let ((current-prefix-arg '(4))) (call-interactively #'counsel-rg)))
+  (let ((current-prefix-arg '(4))) (call-interactively #'consult-grep)))
+
+;; (let ((current-prefix-arg '(4))) (call-interactively #'counsel-rg)))
 
 ;;; Doom Functions & Macros
 ;; A set of fantastic macros written by hlissner
@@ -1039,8 +1149,8 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
                 (cond ((and cmacs--local cmacs--keymaps)
                        (push `(lwarn 'cmacs-map :warning
                                      "Can't local bind '%s' key to a keymap; skipped"
-  ,key)
-  forms)
+                                     ,key)
+                             forms)
                        (throw 'skip 'local))
                       ((and cmacs--keymaps states)
                        (dolist (keymap cmacs--keymaps)
@@ -1213,7 +1323,6 @@ then it takes a second \\[keyboard-quit] to abort the minibuffer."
   "A shortcut for inline interactive lambdas."
   (declare (doc-string 1))
   `(lambda () (interactive) ,@body))
-
 
 ;;;; Other Macros
 (defmacro find-file-in! (path &optional project-p)

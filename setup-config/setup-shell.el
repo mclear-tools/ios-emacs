@@ -10,39 +10,20 @@
               (run-at-time "0.4 sec" nil
                            (lambda ()
                              (select-window (get-buffer-window (get-buffer-create "*compilation*")))
-                             (switch-to-buffer nil)
-                             (if (one-window-p t 0)
-                                 (delete-window)
-                               (other-window 1))))
-              ;; (if (one-window-p t 0)
-              ;;     (delete-window)
-              ;;   (cpm/previous-user-buffer))
-              ;; (other-window 1)))
-              (message "No Compilation Errors!")))))
+                             (delete-window))))
+          (message "No Compilation Errors!"))))
 
 ;;; Completion Buffer
 ;; Remove completion buffer when done
 (add-hook 'minibuffer-exit-hook
-          '(lambda ()
-             (let ((buffer "*Completions*"))
-               (and (get-buffer buffer)
-                    (kill-buffer buffer)))))
+          #'(lambda ()
+              (let ((buffer "*Completions*"))
+                (and (get-buffer buffer)
+                     (kill-buffer buffer)))))
 
 ;;; Terminal
 ;;;; Settings
 ;; Sane settings for ansi-term
-(use-package sane-term
-  :commands sane-term
-  :init
-  ;; shell to use for sane-term
-  (setq sane-term-shell-command "/usr/local/bin/zsh")
-  ;; sane-term will create first term if none exist
-  (setq sane-term-initial-create t)
-  ;; `C-d' or `exit' will kill the term buffer.
-  (setq sane-term-kill-on-exit t)
-  ;; After killing a term buffer, not cycle to another.
-  (setq sane-term-next-on-kill nil))
-
 ;;  Other useful shell settings
 (setq explicit-shell-file-name "/usr/local/bin/zsh")
 ;; don't add newline in long lines
@@ -60,7 +41,7 @@
 
 ;; clickable links & no highlight of line
 (defun my-term-hook ()
-  (goto-address-mode) (global-hl-line-mode 0) (setq comint-buffer-maximum-size most-positive-fixnum))
+  (goto-address-mode) (hl-line-mode 0) (setq comint-buffer-maximum-size most-positive-fixnum))
 (add-hook 'term-mode-hook 'my-term-hook)
 (add-hook 'vterm-mode-hook 'my-term-hook)
 
@@ -74,72 +55,49 @@
 (setenv "PAGER" "cat")
 
 ;; hack to fix pasting issue, the paste micro-state won't work in term
-(general-define-key :states '(normal) :keymaps 'term-raw-map
-       "p" 'term-paste
-       "C-k" 'term-send-up
-       "C-j" 'term-send-down)
+;; (general-define-key :states '(normal motion) :keymaps 'term-raw-map
+;;   "p" 'term-paste
+;;   "C-k" 'term-send-up
+;;   "C-j" 'term-send-down)
 
-(general-define-key :states '(insert) :keymaps 'term-raw-map
-  "C-c C-d" 'term-send-eof
-  "C-c C-z" 'term-stop-subjob
-  "<tab>"   'term-send-tab
-  "s-v"     'term-paste
-  "C-k"     'term-send-up
-  "C-j"     'term-send-down)
+;; (general-define-key :states '(insert) :keymaps 'term-raw-map
+;;   "C-c C-d" 'term-send-eof
+;;   "C-c C-z" 'term-stop-subjob
+;;   "<tab>"   'term-send-tab
+;;   "s-v"     'term-paste
+;;   "C-k"     'term-send-up
+;;   "C-j"     'term-send-down)
 
 
-;;;; Pop up Shell
-;;  A popup shell used with eshell
-;; currently disabled in favor of vterm-toggle
-(use-package shell-pop
-  :disabled
-  :commands shell-pop
-  :init
-  (setq shell-pop-term-shell "/usr/local/bin/zsh")
-  (setq shell-pop-shell-type '("eshell" "*eshell*" (lambda nil (eshell)))))
-  ;; (setq shell-pop-shell-type '("vterm" "*vterm*" (lambda nil (vterm))))
-  ;; :config
-  ;; (defun cpm/term-handle-close ()
-  ;;   "Close current term buffer when `exit' from term buffer."
-  ;;   (when (ignore-errors (get-buffer-process (current-buffer)))
-  ;;     (set-process-sentinel (get-buffer-process (current-buffer))
-  ;;                           (lambda (proc change)
-  ;;                             (when (string-match "\\(finished\\|exited\\)" change)
-  ;;                               (kill-buffer (when (buffer-live-p (process-buffer proc)))
-  ;;                                            (delete-window))))))
-  ;; (add-hook 'shell-pop-out-hook 'kill-this-buffer)))
-
-;;;; Shell Colors
-;; Add customizable 256 color support: https://github.com/dieggsy/eterm-256color  to term and ansiterm
-(use-package eterm-256color
-  :disabled
-  :ensure t
-  :hook
-  (term-mode-hook . eterm-256color-mode)
-  (vterm-mode-hook . eterm-256color-mode))
 
 ;;;; Vterm
 ;; Better terminal function---way faster than ansi-term
-(eval-when-compile
-  (quelpa '(vterm :fetcher github :repo "akermu/emacs-libvterm"
-                  :files (:defaults "*.c" "*.h" "CMakeLists.txt"))))
 (use-package vterm
-  :ensure nil
   :commands (vterm vterm-other-window)
   :general
-  (:states '(normal insert)
+  (:states '(normal motion insert)
    :keymaps 'vterm-mode-map
    ;; fix issue with fzf
-   "C-j" #'term-send-down
+   ;; "C-c" #'vterm-send-C-c
+   "C-g" #'vterm--self-insert
+   "C-j" #'vterm-send-down
+   "C-k" #'vterm-send-up
    "s-v" #'vterm-yank
-   "C-v" #'vterm-yank)
+   "C-v" #'vterm-yank
+   ;; "<C-escape>" #'evil-collection-vterm-toggle-send-escape)
+   "<C-escape>" #'cpm/vterm-escape-toggle)
   (:states '(normal)
    :keymaps 'vterm-mode-map
    "p" #'vterm-yank
    "P" #'vterm-yank)
   :custom (vterm-install t)
   :config
+  (eval-when-compile
+    (setq vterm-always-compile-module t))
+  (setq vterm-keymap-exceptions nil)
   ;; set colors -- this is best with dark solarized right now
+  (setq vterm-kill-buffer-on-exit t)
+  (setq vterm-max-scrollback 100000)
   (setq ansi-color-names-vector
         ["#002833" "#dc322f" "#859900" "#b58900" "#268bd2" "#d33682" "#2aa198" "#657b83"])
   (setq vterm-term-environment-variable "xterm-256color")
@@ -148,6 +106,12 @@
               (setq-local evil-insert-state-cursor '("chartreuse3" box))
               (evil-insert-state))))
 
+;; Escape to vim mode in shell
+(defun cpm/vterm-escape-toggle ()
+  (interactive)
+  (evil-collection-vterm-toggle-send-escape)
+  (vterm-send-key "<escape>"))
+
 ;; directory tracking
 (defun vterm--rename-buffer-as-title (title)
   (let ((dir (string-trim-left (concat (nth 1 (split-string title ":")) "/"))))
@@ -155,11 +119,19 @@
     (rename-buffer (format "term %s" title) t)))
 (add-hook 'vterm-set-title-functions 'vterm--rename-buffer-as-title)
 
+;; vterm frame
+(defun vterm-frame ()
+  "Open a new terminal frame."
+  (interactive)
+  (let ((frame (selected-frame)))
+    (with-selected-frame frame
+      (progn
+        (vterm)
+        (set-frame-parameter frame 'name "terminal")))))
+
 ;; vterm toggle
-(eval-when-compile
-  (quelpa '(vterm-toggle :fetcher github :repo "jixiuf/vterm-toggle")))
 (use-package vterm-toggle
-  :ensure nil
+  :disabled
   :commands (vterm-toggle-forward vterm-toggle-backward vterm-toggle-cd vterm-toggle)
   :config
   (setq vterm-toggle-fullscreen-p nil)
@@ -174,6 +146,10 @@
                  (reusable-frames . visible)
                  (window-height . 0.5))))
 
+
+;;;; Multi-Vterm
+(use-package multi-vterm
+  :commands (multi-vterm multi-vterm-projectile multi-vterm-dedicated-toggle))
 
 ;;; Virtualenvwrapper
 (use-package virtualenvwrapper
@@ -192,7 +168,7 @@
 ;;; Tramp
 ;; An easy way to ssh
 (use-package tramp
-  :ensure nil
+  :straight nil
   :defer 1)
 (use-package tramp-term :commands tramp-term)
 
@@ -259,7 +235,7 @@
 ;; https://github.com/noctuid/general.el/issues/80
 (add-hook 'eshell-mode-hook
 (lambda ()
-(general-define-key :states  '(normal insert emacs) :keymaps 'eshell-mode-map
+  (general-define-key :states  '(normal insert emacs) :keymaps 'eshell-mode-map
     "<down>" 'eshell-next-input
     "<up>"   'eshell-previous-input
     "C-k"    'eshell-next-input
@@ -270,6 +246,7 @@
 ;; with some useful discussion of how it was put together http://www.modernemacs.com/post/custom-eshell/
 ;; I've made just a few tiny modifications.
 
+(with-eval-after-load 'eshell
 (require 'dash)
 (require 's)
 
@@ -325,7 +302,7 @@
 (setq esh-prompt-num 0)
 (add-hook 'eshell-exit-hook (lambda () (setq esh-prompt-num 0)))
 (advice-add 'eshell-send-input :before
-            (lambda (&rest args) (setq esh-prompt-num (incf esh-prompt-num))))
+            (lambda (&rest args) (setq esh-prompt-num (cl-incf esh-prompt-num))))
 
 (esh-section esh-num
              "\xf0c9"  ;  (list icon)
@@ -350,33 +327,20 @@
 (setq eshell-funcs (list esh-dir esh-git esh-python esh-clock esh-num))
 
 ;; Enable the new eshell prompt
-(setq eshell-prompt-function 'esh-prompt-func)
-
-;;;; Shell Switcher
-;; Useful for switching between multiple instances of eshell
-;; https://github.com/DamienCassou/shell-switcher
-;; But you can configure for any shell that you use.
-;; disabled for now since i'm primarily using vterm
-(use-package shell-switcher
-  :disabled
-  :general
-  ("C-'"  'shell-switcher-switch-buffer-other-window)
-  :config
-  (add-hook 'eshell-mode-hook 'shell-switcher-manually-register-shell)
-  (setq shell-switcher-mode t))
+(setq eshell-prompt-function 'esh-prompt-func))
 
 ;;;; Clear Eshell
- ;; Make eshell act like a standard unix terminal.
+;; Make eshell act like a standard unix terminal.
 (defun eshell-clear-buffer ()
-"Clear terminal"
-(interactive)
-(let ((inhibit-read-only t))
-  (erase-buffer)
-  (eshell-send-input)))
+  "Clear terminal"
+  (interactive)
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (eshell-send-input)))
 
 (add-hook 'eshell-mode-hook
-      '(lambda()
-          (local-set-key (kbd "C-l") 'eshell-clear-buffer)))
+          #'(lambda()
+              (local-set-key (kbd "C-l") 'eshell-clear-buffer)))
 
 ;;;; Eshell Magit
 (defun eshell/magit ()
@@ -400,6 +364,6 @@
 (use-package esh-autosuggest
   :hook (eshell-mode . esh-autosuggest-mode))
 
-
+;;;; End Shell
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (provide 'setup-shell)

@@ -1,4 +1,5 @@
 ;; Keybindings for config
+
 ;;; General
 (use-package general
   :demand t
@@ -7,24 +8,34 @@
 	:states '(normal visual motion emacs insert)
 	:keymaps 'override
 	:prefix "SPC"
-	:non-normal-prefix "M-SPC")
+	:non-normal-prefix "C-SPC")
+  (general-create-definer cpm/local-leader-keys
+	:states '(normal visual)
+	:keymaps 'override
+	:prefix ","
+	:non-normal-prefix "C-,")
   (general-override-mode))
 
 ;;; Which Key
 (use-package which-key
   :after general
-  :demand t
+  :defer 1
   :diminish ""
   :config
   (setq which-key-special-keys nil)
   ;; Set the time delay (in seconds) for the which-key popup to appear.
   (setq which-key-idle-delay .6)
+  ;; use minibuffer
+  (which-key-setup-minibuffer)
   (which-key-mode))
 
 ;;; Namespaced Keybindings
+
 ;; set keybindings for use with evil
 (with-eval-after-load 'evil
-;;;;  Application Keybindings
+
+;;;; Application Keybindings
+
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
@@ -42,7 +53,7 @@
    "aw" 'wttrin
    )
 
-;;;;  Buffer Keybindings
+;;;; Buffer Keybindings
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
@@ -50,8 +61,9 @@
    :non-normal-prefix "C-SPC"
 
    "b"  '(:ignore t :which-key "Buffers")
-   "ba" 'counsel-ibuffer
-   "bb" 'ivy-switch-buffer
+   "ba" 'consult-buffer
+   "bb" 'cpm/persp-consult-buffer
+   ;; "bb" 'persp-switch-to-buffer
    ;; "bb" 'helm-mini
    "bc" 'cpm/copy-whole-buffer-to-clipboard
    "bD" 'kill-buffer-and-window
@@ -59,20 +71,21 @@
    "be" 'erase-buffer
    ;; "bf" 'cpm/browse-file-directory
    "bf" 'reveal-in-osx-finder
-   "bg" 'frog-jump-buffer
    "bj" 'cpm/jump-in-buffer
    "bk" 'evil-delete-buffer
    "bK" 'crux-kill-other-buffers
    "bm" 'helm-evil-markers
    "bn" 'evil-buffer-new
    "bN" 'cpm/new-buffer-new-frame
+   "bp" 'consult-projectile
+   "bP" 'persp-temporarily-display-buffer
    "br" 'revert-buffer
    "bR" 'crux-rename-buffer-and-file
-   "bs" 'counsel-switch-buffer-other-window
+   "bs" 'consult-buffer-other-window
    "bt" 'cpm/open-dir-in-iterm
    )
 
-;;;;  Comment Keybindings
+;;;; Comment Keybindings
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
@@ -88,7 +101,7 @@
    "cy"  'evil-commentary-yank-line
    )
 
-;;;;  Config Keybindings
+;;;; Config Keybindings
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
@@ -112,7 +125,7 @@
    "Cs" 'cpm/search-setup-config-files
    )
 
-;;;;  File Keybindings
+;;;; File Keybindings
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
@@ -120,45 +133,49 @@
    :non-normal-prefix "C-SPC"
 
    "f"  '(:ignore t :which-key "Files")
-   "fb" 'counsel-bookmark
+   "fb" 'consult-bookmark
    ;; "fb" 'helm-bookmarks
-   "ff" 'counsel-find-file
+   "ff" 'find-file
    ;; "ff" 'helm-find-files
-   "fl" 'counsel-locate
+   "fl" 'consult-locate
    ;; "fl" 'helm-locate
    "fo" 'crux-open-with
    "fs" 'save-buffer
-   "fr" 'counsel-recentf
+   "fr" 'consult-recent-file
    ;; "fr" 'helm-recentf
    "fy" 'cpm/show-and-copy-buffer-filename
    )
 
-;;;;  General Keybindings
+;;;; General Keybindings
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
    :prefix "SPC"
    :non-normal-prefix "C-SPC"
 
-   "A" 'counsel-apropos
+   "A" 'consult-apropos
+   "?" 'consult-man
    ;; "A" 'helm-apropos
-   "B" #'cpm/dashboard
-   "?" 'counsel-descbinds
+   ;; "B" #'cpm/dashboard
+   ;; "?" 'counsel-descbinds
    ;; "?" 'helm-descbinds
-   "<SPC>" 'counsel-M-x
+   "<SPC>" 'execute-extended-command
    ;; "<SPC>" 'helm-M-x
    ;; "d" #'deer
+   "c" #'company-complete
    "d" #'dired-jump
    "D" #'dired-jump-other-window
    ;; "D" #'cpm/deer-split-window
    "E" 'cpm/call-emacs
    ;; "e" 'server-edit
-   "e" 'cpm/org-to-mail-rtf
+   "e" 'cpm/email-save-and-kill
+   ;; "e" 'cpm/org-to-mail-rtf
    "G" 'general-describe-keybindings
-   "j" 'avy-goto-char
-   "k" 'counsel-yank-pop
+   ;; "j" 'avy-goto-char
+   "k" 'consult-yank-pop
    ;; "k" 'helm-show-kill-ring
-   "l" 'ivy-resume
+   ;; "l" 'uchronia-repeat
+   "l" 'selectrum-repeat
    ;; "l" 'helm-resume
    ;; "N" 'research-notes
    "n" 'cpm/notebook
@@ -166,17 +183,20 @@
    "S" 'hydra-spelling/body
    ;; "W" 'woman
    "#" 'universal-argument
-   "`" 'beacon-blink
+   ;; "`" 'beacon-blink
    ;; "'" 'shell-pop
-   "\\" 'vterm-toggle-cd
+   ;; "\\" 'vterm-toggle-cd
+   "\\" 'multi-vterm-dedicated-toggle
+   "," 'recenter-top-bottom
    "." 'quick-commit
    ";" 'evil-commentary-line
    "[" 'cpm/previous-user-buffer
    "]" 'cpm/next-user-buffer
    "TAB" 'switch-to-previous-buffer
+   ":" 'shell-command
    )
 
-;;;;  Compile Keybindings
+;;;; Compile Keybindings
   (general-define-key
    :states '(normal motion visual insert emacs)
    :keymaps 'override
@@ -195,8 +215,8 @@
 
 ;;; Markdown Keybindings
   (use-package evil-markdown
-    :ensure nil
-    :load-path "~/.emacs.d/.local/elisp/evil-markdown"
+    ;; :load-path "~/.emacs.d/.local/elisp/evil-markdown"
+    :straight (:host github :repo "Somelauw/evil-markdown")
     :after markdown-mode evil
     :demand t)
 
@@ -210,7 +230,7 @@
    "c"  '(:ignore t :which-key "command")
    "h"  '(:ignore t :which-key "insert")
    "i"  '(:ignore t :which-key "lists")
-   "x"  '(:ignore t :which-key "text")
+   "t"  '(:ignore t :which-key "text")
 
    ;; Movement
    "{"   'markdown-backward-paragraph
@@ -225,7 +245,9 @@
 
    ;; Buffer-wide commands
    "c]"  'markdown-complete-buffer
+   "cb"  'cpm/clone-buffer-and-narrow
    "cc"  'multi-compile-run
+   "cl"  'markdown-live-preview-mode
    "cm"  'markdown-other-window
    "cn"  'markdown-cleanup-list-numbers
    "co"  'markdown-open
@@ -266,14 +288,15 @@
    "li"  'markdown-insert-list-item
 
    ;; region manipulation
-   "xb"  'markdown-insert-bold
-   "xi"  'markdown-insert-italic
-   "xc"  'markdown-insert-code
-   "xC"  'markdown-insert-gfm-code-block
-   "xq"  'markdown-insert-blockquote
-   "xQ"  'markdown-blockquote-region
-   "xp"  'markdown-insert-pre
-   "xP"  'markdown-pre-region
+   "tb"  'markdown-insert-bold
+   "ti"  'markdown-insert-italic
+   "tc"  'markdown-insert-code
+   "tC"  'markdown-insert-gfm-code-block
+   "tq"  'markdown-insert-blockquote
+   "tQ"  'markdown-blockquote-region
+   "tp"  'markdown-insert-pre
+   "tP"  'markdown-pre-region
+   "tn"  'cpm/narrow-or-widen-dwim
 
    ;; Following and Jumping
    "N"   'markdown-next-link
@@ -341,25 +364,28 @@
    "p!"  'projectile-run-shell-command-in-root
    "p&"  'projectile-run-async-shell-command-in-root
    "pa"  'projectile-toggle-between-implementation-and-test
-   "pb"  'counsel-projectile-switch-to-buffer
+   ;; "pb"  'projectile-switch-to-buffer
+   "pb"  'consult-projectile
+   ;; "pc"  'consult-projectile
    "pc"  'projectile-compile-project
-   "pd"  'counsel-projectile-find-dir
+   "pd"  'projectile-find-dir
    "pD"  'projectile-dired
-   "pf"  'counsel-projectile-find-file
-   "pF"  #'cpm/counsel-projectile-find-file-other-window
+   "pf"  'projectile-find-file
+   "pF"  'projectile-find-file-other-window
    "pg"  'cpm/goto-projects
-   "ph"  'counsel-projectile
-   "pJ"  'counsel-bookmark
+   ;; "ph"  'projectile
+   "pi"  'consult-project-imenu
+   "pJ"  'bookmark
    "pG"  'projectile-regenerate-tags
    "pI"  'projectile-invalidate-cache
    "pk"  'projectile-kill-buffers
    "pn"  #'cpm/open-new-buffer-and-workspace
    "pN"  #'cpm/create-new-project-and-workspace
    "po"  #'cpm/open-existing-project-and-workspace
-   "pp"  'counsel-projectile-switch-project
-   "pr"  'counsel-recentf
+   "pp"  'projectile-switch-project
+   "pr"  'recentf
    "pR"  'projectile-replace
-   "ps"  #'counsel-projectile-rg
+   "ps"  #'projectile-ag
    ;; "ps1" #'cpm/load-phil101
    ;; "ps2" #'cpm/load-phil232
    ;; "ps5" #'cpm/load-phil105
@@ -388,8 +414,10 @@
    :non-normal-prefix "C-SPC"
 
    "q"  '(:ignore t :which-key "Quit")
-   "qq" 'cpm/save-desktop-save-buffers-kill-emacs
-   "qQ" 'evil-quit-all
+   ;; "qq" 'cpm/save-desktop-save-buffers-kill-emacs
+   "qd" 'cpm/kill-emacs-capture-daemon
+   "qq" 'evil-quit-all
+   "qQ" 'cpm/kill-all-emacsen
    "qr" 'restart-emacs
    )
 
@@ -401,31 +429,37 @@
    :non-normal-prefix "C-SPC"
 
    "s" '(:ignore t :which-key "Search")
-   "sa" 'helm-org-rifle-agenda-files
-   "sd" 'counsel-rg ; search current buffer's directory
-   "sD" #'cpm/counsel-search-in-input-dir ; search with directory input
-   "sb" 'swiper-all
+   ;; "sa" 'helm-org-rifle-agenda-files
+   "sa" 'consult-org-agenda
+   "sd" 'affe-grep; search current buffer's directory
+   "sD" #'cpm/search-in-input-dir ; search with directory input
+   "sb" 'consult-multi-occur
    ;; "sb" 'helm-ag-buffers
    ;; "sf" 'helm-do-ag-this-file
-   "sf" 'swiper
+   "sf" 'consult-line
+   "sh" 'consult-org-heading
    "sj" 'cpm/forward-or-backward-sexp
-   "sk" 'counsel-yank-pop
-   "sl" 'ivy-resume
+   "sk" 'consult-yank-pop
+   "sl" 'selectrum-repeat
    "sn" #'cpm/search-all-notes
    ;; "sk" 'helm-show-kill-ring
    ;; "sl" 'cpm/helm-list-search-buffers
    ;; "sm" 'swiper-mc
-   "so" #'ivy-occur
+   ;; "so" #'ivy-occur
    ;; "so" 'helm-occur
-   "sp" 'swiper-thing-at-point
+   ;; "sp" 'swiper-thing-at-point
+   "sp" #'consult-line-symbol-at-point
    "sr" #'vr/query-replace
-   "sR" 'helm-org-rifle
-   "ss" 'swiper-isearch
+   ;; "sR" 'helm-org-rifle
+   ;; "ss" #'swiper
+   "ss" 'consult-line
    ;; "ss" #'counsel-grep-or-swiper ;; search with swiper in file
    ;; "ss" 'helm-swoop-without-pre-input ;; search with swoop in file
    "sS" #'cpm/flyspell-ispell-goto-next-error ;; search for next spelling error
-   "st" #'cpm/search-file-todo-markers ;; search for TODOs in file w/helm-ag
-   "sT" #'cpm/search-todo-markers ;; search todo markers in directory w/helm-ag
+   "st" #'cpm/hydra-todo/body
+   ;; "st" #'cpm/search-file-todo-markers ;; search for TODOs in file w/helm-ag
+   ;; "sT" #'ivy-magit-todos  ;; search todos in git project
+   ;; "sT" #'cpm/search-todo-markers ;; search todo markers in directory w/helm-ag
    )
 
 ;;; Toggle Keybindings
@@ -464,11 +498,11 @@
    "ts" 'flyspell-mode
    "tS" 'ispell-buffer
    "tt" 'toggle-dark-light-theme
-   "tT" 'helm-themes
+   "tT" 'cpm/load-theme
+   ;; "tT" 'helm-themes
    "tv" 'vterm-toggle-cd
    "tw" 'writeroom-mode
    "tz" 'zone
-   ;; "tt" 'counsel-load-theme
    )
 
 ;;; User Keybindings
@@ -496,8 +530,12 @@
    "uaw" 'cpm/jump-to-week-agenda
    "um" 'cpm/org-to-markdown
    ;; "uc" 'cpm/pandoc-convert-to-pdf
+   "ub" '(:ignore t :which-key "Beamer functions")
+   "ubp" #'cpm/org-export-beamer-presentation
+   "ubh" #'cpm/org-export-beamer-handout
    "uC" 'cpm/pandoc-command-line-convert-to-pdf
    "ug" 'org-mac-grab-link
+   "uh" #'cpm/org-export-to-buffer-html-as-body
    "ui" 'cpm/org-goto-inbox
    "uk" 'kill-compilation
    "ul" 'desktop-read
@@ -514,7 +552,7 @@
    ;; "op" 'pandoc-convert-to-pdf
    "uw" 'count-words
    "uW" 'osx-dictionary-search-input
-   "ux" 'ivy-bibtex
+   "ux" 'bibtex-actions-open
    )
 
 ;;; Version Control (Git) Keybindings
@@ -543,12 +581,12 @@
    :prefix "SPC"
    :non-normal-prefix "C-SPC"
 
-   "0" 'select-window-0
-   "1" 'select-window-1
-   "2" 'select-window-2
-   "3" 'select-window-3
-   "4" 'select-window-4
-   "5" 'select-window-5
+   "0" 'winum-select-window-0
+   "1" 'winum-select-window-1
+   "2" 'winum-select-window-2
+   "3" 'winum-select-window-3
+   "4" 'winum-select-window-4
+   "5" 'winum-select-window-5
 
    "w"  '(:ignore t :which-key "Windows")
    "wa" 'ace-window
@@ -570,7 +608,6 @@
 
 ;;; Org Keybindings
   (use-package evil-org
-    :ensure t
     :after org
     :hook (org-mode . evil-org-mode)
     :config
@@ -599,16 +636,17 @@
    ":"   #'org-set-tags
    "a"   #'cpm/jump-to-org-super-agenda
    "A"   #'org-archive-subtree
-   "b"   #'org-tree-to-indirect-buffer
+   "b"   #'cpm/clone-buffer-and-narrow
    "B"   #'org-babel-tangle
    "c"   #'org-capture
    "d"   #'org-time-stamp
    "D"   #'org-deadline
    "e"   #'org-edit-special
+   "f"   #'org-fill-paragraph
    "n"   #'cpm/narrow-or-widen-dwim
    "r"   #'org-refile
    "s"   #'org-schedule
-   "t"   #'counsel-org-tag
+   "t"   #'cpm/org-select-tags-completing-read
    "T"   #'org-todo
    "v"   #'variable-pitch-mode
    "l"   #'org-insert-link
@@ -655,9 +693,9 @@
   (general-define-key :states '(normal insert) :keymaps 'org-mode-map
     ;; easily emphasize text
     ;; see https://emacs.stackexchange.com/questions/27645/unable-to-bind-emphasize-key-in-org-mode
-    "s-b" (lambda () (interactive) (org-emphasize ?\*))
-    "s-i" (lambda () (interactive) (org-emphasize ?\/))
-    "s-l" (lambda () (interactive) (org-emphasize ?\=))
+    "s-b" (lambda () (interactive) (er/mark-word) (org-emphasize ?\*))
+    "s-i" (lambda () (interactive) (er/mark-word) (org-emphasize ?\/))
+    "s-l" (lambda () (interactive) (er/mark-word) (org-emphasize ?\=))
     ;; better pasting behavior in org-mode
     "s-v" 'org-yank)
 

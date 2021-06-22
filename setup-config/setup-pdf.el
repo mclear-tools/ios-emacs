@@ -1,4 +1,5 @@
-;;; PDF Management
+;; PDF Management
+
 ;;;; Doc-View Mode
 (use-package doc-view
   :disabled
@@ -136,11 +137,20 @@
 ;;;; PDF-Tools
 ;; good but often problematic pdf reader and annotator
 (use-package pdf-tools
+  :straight t
   :mode (("\\.pdf$" . pdf-view-mode))
   :commands (pdf-view-mode)
   :config
+  ;; initialise
+  (pdf-loader-install :no-query)
+  ;; open pdfs scaled to fit page
+  (setq-default pdf-view-display-size 1.25)
+  ;; automatically annotate highlights
+  (setq pdf-annot-activate-created-annotations t)
+  ;; HiDPI
+  (setq pdf-view-use-scaling t
+        pdf-view-use-imagemagick nil)
   (progn
-    (pdf-tools-install)
     (evil-set-initial-state 'pdf-view-mode 'normal)
     (evil-set-initial-state 'pdf-outline-buffer-mode 'normal)
     (general-define-key :states '(normal) :keymaps 'pdf-view-mode-map
@@ -177,7 +187,9 @@
       "y" 'pdf-view-kill-ring-save )
 
     ;; midnite mode
-    (setq pdf-view-midnight-colors '("#839496" . "#002b36" )) ; original values
+    ;; (setq pdf-view-midnight-colors '("#839496" . "#002b36" )) ; original values
+    (setq pdf-view-midnight-colors '("#ECEFF4" . "#434C5E" )) ; nano values
+
 
     (defun bms/pdf-no-filter ()
       "View pdf without colour filter."
@@ -189,7 +201,8 @@
     (defun bms/pdf-midnite-original ()
       "Set pdf-view-midnight-colors to original colours."
       (interactive)
-      (setq pdf-view-midnight-colors '("#839496" . "#002b36" )) ; original values
+      (setq pdf-view-midnight-colors '("#ECEFF4" . "#434C5E" )) ; nano values
+      ;; (setq pdf-view-midnight-colors '("#839496" . "#002b36" )) ; original values
       (pdf-view-midnight-minor-mode)
       )
 
@@ -220,7 +233,10 @@
           (bms/pdf-no-filter)
         (bms/pdf-midnite-original)))
 
-    ;; midnite mode hook
+    ;; tex hook
+    ;; see https://github.com/politza/pdf-tools#auto-revert
+    (add-hook 'TeX-after-compilation-finished-functions #'TeX-revert-document-buffer)
+    ;; other hooks
     (add-hook 'pdf-view-mode-hook (lambda ()
                                         ; automatically turns on midnight-mode for pdfs
                                     (pdf-view-midnight-minor-mode)
@@ -228,24 +244,58 @@
                                     (bms/pdf-midnite-colour-schemes)
                                         ; fixes blinking pdf in evil
                                     (blink-cursor-mode -1)
-                                    (beacon-mode -1))))
-  ;;;Hidpi
-  (setq pdf-view-use-scaling t))
+                                    (linum-mode -1)
+                                    (line-number-mode -1)
+                                    (column-number-mode -1)
+                                    (auto-revert-mode -1)))))
 
-;; (eval-when-compile
-;;   (quelpa
-;;    '(org-pdftools :fetcher github :repo "fuxialexander/org-pdftools"))
-;;   )
+;;;; PDF Notetaking Tools
+(defvar user-pdf-dir
+  "~/Library/Mobile Documents/iCloud~com~sonnysoftware~bot/Documents/be-library")
 
+(use-package org-noter
+  :after org
+  :commands (org-noter)
+  :config
+  (setq org-noter-auto-save-last-location t
+        org-noter-insert-selected-text-inside-note t
+        org-noter-insert-note-no-questions t
+        org-noter-kill-frame-at-session-end t
+        org-noter-default-notes-file-names '("noter-notes.org")
+        org-noter-notes-search-path '("~/Dropbox/Work/projects/notebook/content-org")))
+
+;; Couldn't get either of these working
+(use-package org-pdfview
+  :disabled
+  :config
+  (org-link-set-parameters "pdfview"
+                           :follow #'org-pdfview-open
+                           :export #'org-pdfview-export
+                           :complete #'org-pdfview-complete-link
+                           :store #'org-pdfview-store-link)
+  (add-to-list 'org-file-apps '("\\.pdf\\'" . (lambda (file link) (org-pdfview-open link))))
+  (add-to-list 'org-file-apps '("\\.pdf::\\([[:digit:]]+\\)\\'" . (lambda (file link) (org-pdfview-open link)))))
+
+;; I can't seem to get this to work...
 (use-package org-pdftools
   :disabled
-  :ensure nil
-  :commands (org-pdftools-open)
-  :after pdf-tools
-  :init
-  (add-to-list 'org-file-apps
-               '("\\.pdf\\'" . (lambda (file link)
-                                 (org-pdfview-open link)))))
+  :after org
+  :demand t
+  :init (setq org-pdftools-search-string-separator "??")
+  :config
+  (setq org-pdftools-root-dir user-pdf-dir)
+  (org-link-set-parameters "pdftools"
+                           :follow #'org-pdftools-open
+                           :complete #'org-pdftools-complete-link
+                           :store #'org-pdftools-store-link
+                           :export #'org-pdftools-export)
+  (add-hook 'org-store-link-functions 'org-pdftools-store-link))
+
+(use-package org-noter-pdftools
+  :disabled
+  :after (org-noter))
+
+
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 (provide 'setup-pdf)

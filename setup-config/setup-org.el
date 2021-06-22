@@ -2,26 +2,33 @@
 
 ;;; New Org
 ;; remove references to older org in path
-(setq load-path (cl-remove-if (lambda (x) (string-match-p "org$" x)) load-path))
+;; (setq load-path (cl-remove-if (lambda (x) (string-match-p "org$" x)) load-path))
 
 ;; Org package settings -- use org-plus-contrib to get latest org
 (use-package org
+  :straight t
+  ;; :straight (:host github :repo "yantar92/org" :branch "feature/org-fold"
+  ;;            :files (:defaults "contrib/lisp/*.el")) ;; fixes org-folding
   :mode (("\\.org$" . org-mode))
-  :ensure org-plus-contrib
   :general (cpm/leader-keys
              "uc" 'org-capture)
   :init
 ;;; Org Settings
 ;;;; Org Directories
-  (setq-default org-directory "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/org-files/")
+  ;; (setq-default org-directory "~/Library/Mobile Documents/iCloud~com~appsonthemove~beorg/Documents/org-files/")
+  (setq-default org-directory "~/Dropbox/org-files/")
   (setq-default org-default-notes-file (concat org-directory "inbox.org"))
   (setq-default org-agenda-files (list org-directory))
 
-  :config
 ;;;; Org Config Settings
+  :config
+  ;; (require 'org-fold)   ;; hack to make org and evil-surround work right now FIXME
+  ;; use timestamp for id
+  (setq org-latex-listings 'engraved) ;; relies on engrave-faces package for highlighting
   (add-hook 'org-mode-hook #'visual-line-mode)
   (setq org-stuck-projects (quote ("" nil nil "")))
   (setq org-image-actual-width  500) ;; show all images at 500px using imagemagik
+  (setf org-export-with-smart-quotes t)
   (setq-default org-footnote-section nil ;; place footnotes locally rather than in own section
                 org-return-follows-link t ;; make RET follow links
                 org-list-allow-alphabetical t ;; allow alphabetical list
@@ -29,7 +36,6 @@
                 org-pretty-entities t ;; make latex look good
                 org-pretty-entities-include-sub-superscripts t
                 org-hide-leading-stars t
-                org-export-with-smart-quotes t ;; export smart quote marks
                 org-refile-use-cache t  ;; use cache for org refile
                 org-startup-folded t
                 org-yank-adjusted-subtrees t  ;; adjust subtrees to depth when yanked
@@ -43,40 +49,32 @@
                 ;; prevent editing invisible area, and show an error message in echo area instead;
                 ;; additionally expand text and move focus to the expected point.
                 org-catch-invisible-edits 'show-and-error
+                org-use-fast-todo-selection 'expert ;; don't use popup window
                 org-imenu-depth 8
                 imenu-auto-rescan t)
   (add-hook 'auto-save-hook 'org-save-all-org-buffers)
 
-  ;; show markup on cursor
-  ;; https://www.reddit.com/r/orgmode/comments/43uuck/temporarily_show_emphasis_markers_when_the_cursor
-  (defun cpm/org-show-emphasis-markers-at-point ()
-    (save-match-data
-      (if (and (org-in-regexp org-emph-re 2)
-               (>= (point) (match-beginning 3))
-               (<= (point) (match-end 4))
-               (member (match-string 3) (mapcar 'car org-emphasis-alist)))
-          (with-silent-modifications
-            (remove-text-properties
-             (match-beginning 3) (match-beginning 5)
-             '(invisible org-link)))
-        (apply 'font-lock-flush (list (match-beginning 3) (match-beginning 5))))))
-
-  (add-hook 'post-command-hook
-            'cpm/org-show-emphasis-markers-at-point nil t)
-
 
 ;;;; Org Modules
-  (setq org-modules (quote (org-tempo org-protocol org-habit org-mac-link)))
+  (with-eval-after-load 'org
+    (add-to-list 'org-modules 'org-habit t)
+    (add-to-list 'org-modules 'org-tempo t)
+    (add-to-list 'org-modules 'org-protocol t)
+    (add-to-list 'org-modules 'org-mac-link t)
+    )
+
 
 ;;;; Org ID
   (setq org-id-locations-file (concat cpm-cache-dir ".org-id-locations"))
+  (setq org-id-method 'ts) ;; use timestamp for id
+  (setq org-id-link-to-org-use-id 'create-if-interactive-and-no-custom-id) ;; create ids
 
 ;;;; Org State Settings
   (setq org-todo-keywords
         '((sequence "TODO(t)" "DOING(g)" "NEXT(n)" "WAITING(w@/!)" "MAYBE(m)" "SOMEDAY(s)" "|" "DONE(d)")
           (sequence "WAITING(w@/!)" "HOLD(h@/!)" "|" "CANCELED(c@/!)")))
 ;;;; Org Priority Settings
-  (setq org-priority-faces '((?A . (:foreground "red" :weight 'bold))
+  (setq org-priority-faces '((?A . (:foreground "red"))
                              (?B . (:foreground "orange"))
                              (?C . (:foreground "DarkGoldenrod2"))
                              (?D . (:forefround "green"))))
@@ -109,7 +107,8 @@
 ;;;; Org Entities
   (setq org-entities-user
         '(("nec" "\Box" nil "◻" "" "" "◻")
-          ("pos" "\Diamond" nil "◇" "" "" "◇")))
+          ("pos" "\Diamond" nil "◇" "" "" "◇")
+          ("space" "~" nil "&nbsp;" " " " " " ")))
   (add-hook 'org-mode-hook
             (lambda ()
               (centered-cursor-mode)
@@ -119,8 +118,10 @@
 ;;;; Org Regex (Emphasis)
   (with-eval-after-load 'org
                                         ; chars for prematch
+    ;; (setcar org-emphasis-regexp-components " \t('\"{[:alpha:]")
     (setcar org-emphasis-regexp-components            "     ('\"{“”\[\\\_\-")
                                         ; chars for postmatch
+    ;; (setcar (nthcdr 1 org-emphasis-regexp-components) "[:alpha:]- \t.,:!?;'\")}\\")
     (setcar (nthcdr 1 org-emphasis-regexp-components) "\] -   .,!?;:''“”\")}/\\“”\_\-")
                                         ; forbidden chars
     (setcar (nthcdr 2 org-emphasis-regexp-components) "    \t\r\n,\"")
@@ -133,9 +134,10 @@
 ;;;; Org Template Expansions
   (setq new-structure-template-alist
         '(("el" . "src emacs-lisp")
-          ("t" . "COMMENT TODO:")
+          ("t" . "COMMENT \TODO:")
           ("b" . "REVEAL: split")
-          ("f" . "ATTR_REVEAL: :frag (appear)")))
+          ("f" . "ATTR_REVEAL: :frag (appear)")
+          ("n" . "notes")))
   (dolist (ele new-structure-template-alist)
     (add-to-list 'org-structure-template-alist ele))
 
@@ -161,6 +163,7 @@
         ;; org-agenda-sticky t
         org-agenda-span 'day)
 
+  (general-define-key "C-c a" #'org-agenda)
   (with-eval-after-load 'org-agenda
     (general-define-key :keymaps 'org-agenda-mode-map
       "j" 'org-agenda-next-item
@@ -171,7 +174,7 @@
     (interactive)
     (when (get-buffer "*Org Agenda*")
       (with-current-buffer "*Org Agenda*"
-        (org-agenda-redo t)
+        (org-agenda-redo)
         (message "[org agenda] refreshed!"))))
   (add-hook 'org-capture-after-finalize-hook 'cpm/org-agenda-refresh)
 
@@ -197,6 +200,55 @@
           (tags .
                 " %i %-12:c %(concat \"\"(org-format-outline-path (org-get-outline-path)) \" \->\") ")
           (search . " %i %-12:c")))
+
+;;;; Org Super-Agenda
+  ;; Supercharge org-agenda: https://github.com/alphapapa/org-super-agenda
+  ;; Settings courtesy of alphapapa: https://github.com/alphapapa/org-super-agenda/blob/master/examples.org#forward-looking
+
+  (use-package org-super-agenda
+    :straight t
+    :commands org-super-agenda-mode
+    :after org
+    :general
+    (:states '(normal motion emacs) :keymaps 'org-agenda-keymap
+     ","  'cpm/hydra-org-agenda/body)
+    :config
+    (org-super-agenda-mode)
+    (setq org-super-agenda-date-format "%A, %e %b")
+    (let ((two-weeks-from-today (format-time-string "%Y-%m-%d" (org-read-date nil t "+2w"))))
+      (setq org-super-agenda-groups
+            '(
+              (:name "Today"
+               :time-grid t
+               :date today
+               :order 1)
+              (:name "Scheduled earlier"
+               :scheduled past
+               :order 4)
+              (:name "Overdue"
+               :deadline past
+               :order 6)
+              (:name "Due Today"
+               :deadline today
+               :order 8)
+              (:name "Due Soon"
+               :deadline future
+               :order 10)
+              )))
+
+    (defun cpm/jump-to-org-super-agenda ()
+      (interactive)
+      (require 'org)
+      (require 'org-super-agenda)
+      (org-agenda nil "A")))
+
+;;;; Agenda Toggle
+  (defun cpm/toggle-org-agenda-file-set ()
+    (interactive)
+    (if (equal org-agenda-files (list org-directory))
+        (setq org-agenda-files (list "~/Dropbox/Work/projects/notebook/content-org/"))
+      (setq org-agenda-files (list org-directory)))
+    (message "Using %s" org-agenda-files))
 
 ;;;; Agenda Navigation
   ;; Courtesy of [[https://blog.aaronbieber.com/2016/09/25/agenda-interactions-primer.html][Aaron Bieber]]
@@ -231,10 +283,10 @@
       (if pos (goto-char pos))
       (if backwards (goto-char (line-beginning-position)))))
 
-  (with-eval-after-load 'org-agenda
-    (general-define-key :keymaps 'org-agenda-mode-map :states '(normal motion)
-      "J" 'air-org-agenda-next-header
-      "K" 'air-org-agenda-previous-header))
+  ;; (with-eval-after-load 'org-agenda
+  ;;   (general-define-key :keymaps 'org-agenda-mode-map :states '(normal motion)
+  ;;     "J" 'air-org-agenda-next-header
+  ;;     "K" 'air-org-agenda-previous-header))
 
   (defun air-org-skip-subtree-if-habit ()
     "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
@@ -254,45 +306,9 @@ PRIORITY may be one of the characters ?A, ?B, or ?C."
           subtree-end
         nil)))
 
-;;;; Org Super-Agenda
-  ;; Supercharge org-agenda: https://github.com/alphapapa/org-super-agenda
-  ;; Settings courtesy of alphapapa: https://github.com/alphapapa/org-super-agenda/blob/master/examples.org#forward-looking
-
-  (use-package org-super-agenda
-    ;; :pin manual ;; throws errors for some reason when I update
-    :commands org-super-agenda-mode
-    :general
-    (:states '(normal motion emacs) :keymaps 'org-agenda-keymap
-     ","  'cpm/hydra-org-agenda/body)
-    :after (org org-agenda)
-    :config
-    (org-super-agenda-mode)
-    (setq org-super-agenda-date-format "%A, %e %b")
-    (setq org-super-agenda-groups
-          '((:name "Overdue"
-             :deadline past)
-            (:name "Scheduled"
-             :time-grid t)
-            (:name "Today"
-             :scheduled today
-             :deadline nil)
-            (:name "Due Today"
-             :deadline today)
-            (:name "Upcoming"
-             ;; :deadline future
-             ;; :scheduled future
-             :auto-ts t)
-            ;; (:name "Scheduled"
-            ;;  :scheduled t)
-            )))
-
-  (defun cpm/jump-to-org-super-agenda ()
-    (interactive)
-    (org-agenda nil "A"))
-
 ;;;; Hydra for Agenda
   ;; Hydra for org agenda (graciously offered by Spacemacs)
-  (after! org-agenda
+  (with-eval-after-load 'org-agenda
     (org-super-agenda-mode)
     (defhydra cpm/hydra-org-agenda (:color pink :hint none)
       "
@@ -387,20 +403,22 @@ _vr_ reset      ^^                       ^^                 ^^
                                              (org-agenda-sorting-strategy
                                               '(category-keep))))))
           ("w" todo "WAITING")
-          ("A" "Super Agenda" (
-                               (agenda "" ((org-agenda-span 'day)))
-                               (alltodo "" ((org-agenda-overriding-header nil)
-                                            (org-super-agenda-groups
-                                             '((:name "Priority"
-                                                :priority>= "C")
-                                               (:name "Next to do"
-                                                :todo "NEXT")
-                                               (:name "In Progress"
-                                                :todo "DOING")
-                                               (:todo ("WAITING" "HOLD"))
-                                               (:todo "MAYBE")
-                                               (:name "Reading List"
-                                                :todo "TOREAD")))))))
+          ("A" "Super Agenda" ((agenda "" ((org-agenda-span 'day)))))
+          ;; (alltodo "" ((org-agenda-overriding-header "")
+          ;; (org-super-agenda-groups
+          ;;  '(
+          ;;    (:name "Priority"
+          ;;     :priority>= "C")
+          ;;    (:name "Next to do"
+          ;;     :todo "NEXT")
+          ;;    (:name "In Progress"
+          ;;     :todo "DOING")
+          ;;    (:todo ("WAITING" "HOLD"))
+          ;;    (:todo "MAYBE")
+          ;;    (:name "Reading List"
+          ;;     :todo "TOREAD")
+          ;;    ))
+          ;; )
           ("W" "Week's agenda and all TODOs"
            ((tags "PRIORITY=\"A\""
                   ((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
@@ -415,10 +433,10 @@ _vr_ reset      ^^                       ^^                 ^^
 ;;; Org Capture
 ;;;; Capture Settings
   (add-hook 'org-capture-mode-hook 'evil-insert-state)
-  (general-define-key
-   :states '(insert normal motion emacs)
-   :keymaps 'override
-   "C-c c" #'org-capture)
+  ;; (general-define-key
+  ;;  :states '(insert normal motion emacs)
+  ;;  :keymaps 'override
+  ;;  "C-c c" #'org-capture)
   (setq org-capture-templates
         ;; Note the ` and , to get concat to evaluate properly
         `(("c" "Capture" entry (file ,(concat org-directory "inbox.org"))
@@ -427,10 +445,12 @@ _vr_ reset      ^^                       ^^                 ^^
            "**** %<%H:%M>\n%?")
           ("l" "A link, for reading later" entry (file ,(concat org-directory "inbox.org"))
            "* %? :link: \n%(grab-mac-link 'safari 'org)")
-          ("m" "Mail-Task" entry (file ,(concat org-directory "inbox.org"))
-           "* TODO %? :email: \n%(grab-mac-link 'mail 'org)")
           ;; ("m" "Mail-Task" entry (file ,(concat org-directory "inbox.org"))
-          ;;  "* TODO %:description                         :email: \n[[message://%:link][Email link]] \n%? ")
+          ;;  "* TODO %? :email: \n%(org-mac-outlook-message-get-links)")
+          ;; ("m" "Mail-Task" entry (file ,(concat org-directory "inbox.org"))
+          ;;  "* TODO %? :email: \n%(grab-mac-link 'mail 'org)")
+          ("m" "Mail-Task" entry (file ,(concat org-directory "inbox.org"))
+           "* TODO %:description                         :email: \n[[message://%:link][Email link]] \n%? ")
           ("r" "Reference" entry (file ,(concat org-directory "reference.org"))
            "* %?")
           ("M" "UNL Merit Review" entry (file ,(concat org-directory "merit-reviews.org"))
@@ -448,6 +468,12 @@ _vr_ reset      ^^                       ^^                 ^^
 
   (add-hook 'org-capture-before-finalize-hook 'add-property-with-date-captured)
 
+  ;; Add newline to captured items
+  (defun cpm/org-capture-newlines-at-end ()
+    (goto-char (point-max))
+    (insert "\n\n"))
+  (add-hook 'org-capture-prepare-finalize 'cpm/org-capture-newlines-at-end)
+
 ;;;; Org Journal Capture
   ;; Tell emacs what you're doing a few times a day. Depends on a
   ;; [[/Users/roambot/bin/scripts/emacs_journal.sh][shell script]] run in the
@@ -460,87 +486,108 @@ _vr_ reset      ^^                       ^^                 ^^
   (defun cpm/org-journal ()
     (interactive) (org-capture nil "j"))
 
-  (defun cpm/what-are-you-doing-capture ()
-    (interactive)
-    (make-frame '((name . "What are you doing?") (left . (+ 550)) (top . (+ 400)) (width . 100) (height . 24)))
-    (select-frame-by-name "What are you doing?")
-    (cpm/org-journal)
-    (cpm/insert-weather)
-    (goto-char (point-max)))
+  ;; (defun cpm/what-are-you-doing-capture ()
+  ;;   (interactive)
+  ;;   (make-frame '((name . "What are you doing?") (left . (+ 550)) (top . (+ 400)) (width . 100) (height . 24)))
+  ;;   (select-frame-by-name "What are you doing?")
+  ;;   (cpm/org-journal)
+  ;;   (delete-other-windows)
+  ;;   (cpm/insert-weather)
+  ;;   (goto-char (point-max)))
 
 ;;;; Alfred Capture Workflow
-  ;; Help alfred and org-capture play nice. Courtesy of [[http://orgmode.org/worg/org-contrib/alfred-org-capture.html][worg]] with some slight modifications.
+  ;; Help alfred and org-capture play nice.
+  ;; Courtesy of http://orgmode.org/worg/org-contrib/alfred-org-capture.html with some slight modifications.
+  ;; Current functions also from https://github.com/Isimoro/org-global-capture.el/blob/master/org-global-capture.el
 
-  (defun cpm/org-capture-link-frame ()
-    "Capture link from frontmost safari tab"
-    (interactive)
-    (org-capture nil "l"))
-  (defun cpm/make-org-capture-link-frame ()
-    "Create a new frame and run org-capture."
-    (interactive)
-    (make-frame '((name . "alfred-capture") (width . 90) (height . 20)
-                  (top . 400) (left . 300)
-                  ))
-    (select-frame-by-name "alfred-capture")
-    (cpm/org-capture-link-frame))
+  (defadvice org-switch-to-buffer-other-window
+      (after supress-window-splitting activate)
+    "Delete the extra window if we're in a capture frame"
+    (if (equal "capture" (frame-parameter nil 'name))
+        (delete-other-windows)))
 
-  (defun cpm/org-capture-frame ()
-    (interactive)
-    (org-capture nil "c"))
-  (defun cpm/make-orgcapture-frame ()
-    "Create a new frame and run org-capture."
-    (interactive)
-    (make-frame '((name . "alfred-capture") (width . 90) (height . 20)
-                  (top . 400) (left . 300)
-                  ))
-    (select-frame-by-name "alfred-capture")
-    (cpm/org-capture-frame))
+  (defadvice org-capture-finalize
+      (after delete-capture-frame activate)
+    "Advise capture-finalize to close the frame"
+    (when (and (equal "capture" (frame-parameter nil 'name))
+               (not (eq this-command 'org-capture-refile)))
+      (delete-frame)))
 
-  (defun cpm/org-capture-mail-frame ()
-    (interactive)
-    (org-capture nil "m"))
-  (defun cpm/make-org-capture-mail-frame ()
-    "Create a new frame and run org-capture."
-    (interactive)
-    (make-frame '((name . "Email Capture") (width . 90) (height . 20)
-                  (top . 400) (left . 300)
-                  ))
-    (select-frame-by-name "Email Capture")
-    (cpm/org-capture-mail-frame))
+  (defadvice org-capture-refile
+      (after delete-capture-frame activate)
+    "Advise org-refile to close the frame"
+    (when (equal "capture" (frame-parameter nil 'name))
+      (delete-frame)))
 
 
-
-
-;;;; Capture Hooks
-  ;; ;; Make capture the only window and close after refiling.
-  (defun cpm/capture-single-window-frame ()
-    "make org capture the only window in the new frame"
-    (cond ((equal "What are you doing?" (frame-parameter nil 'name)) (delete-other-windows))
-          ((equal "alfred-capture" (frame-parameter nil 'name)) (delete-other-windows))
-          ((equal "Email Capture" (frame-parameter nil 'name)) (delete-other-windows))))
-  (defun cpm/delete-capture-frame ()
-    "kill frame after capture"
-    (cond ((equal "What are you doing?" (frame-parameter nil 'name)) (delete-frame))
-          ((equal "alfred-capture" (frame-parameter nil 'name)) (delete-frame))
-          ((equal "Email Capture" (frame-parameter nil 'name)) (delete-frame))))
-  (add-hook! 'org-capture-mode-hook #'cpm/capture-single-window-frame)
-  (add-hook! 'org-capture-after-finalize-hook #'cpm/delete-capture-frame)
-
-  ;; (defadvice org-capture
-  ;;     (after make-full-window-frame activate)
-  ;;   "Advise capture to be the only window when used as a popup"
-  ;;   (cond ((equal "What are you doing?" (frame-parameter nil 'name)) (delete-other-windows))
-  ;;         ((equal "alfred-capture" (frame-parameter nil 'name)) (delete-other-windows))
-  ;;         ((equal "Email Capture" (frame-parameter nil 'name)) (delete-other-windows))))
-
-  ;; (defadvice org-capture-finalize
-  ;;     (after org-capture-finalize activate)
-  ;;   "Advise capture-finalize to close the frame"
-  ;;   (cond ((equal "What are you doing?" (frame-parameter nil 'name)) (delete-frame))
-  ;;         ((equal "alfred-capture" (frame-parameter nil 'name)) (delete-frame))
-  ;;         ((equal "Email Capture" (frame-parameter nil 'name)) (delete-frame))
-  ;;         ))
-
+;;;; Fix Org Capture Recentering Window problem
+  (eval-after-load "org-agenda"
+    '(defun org-agenda-redo (&optional all)
+       "Rebuild possibly ALL agenda view(s) in the current buffer."
+       (interactive "P")
+       (let* ((p (or (and (looking-at "\\'") (1- (point))) (point)))
+              (cpa (unless (eq all t) current-prefix-arg))
+              (org-agenda-doing-sticky-redo org-agenda-sticky)
+              (org-agenda-sticky nil)
+              (org-agenda-buffer-name (or org-agenda-this-buffer-name
+                                          org-agenda-buffer-name))
+              (org-agenda-keep-modes t)
+              (tag-filter org-agenda-tag-filter)
+              (tag-preset (get 'org-agenda-tag-filter :preset-filter))
+              (top-hl-filter org-agenda-top-headline-filter)
+              (cat-filter org-agenda-category-filter)
+              (cat-preset (get 'org-agenda-category-filter :preset-filter))
+              (re-filter org-agenda-regexp-filter)
+              (re-preset (get 'org-agenda-regexp-filter :preset-filter))
+              (effort-filter org-agenda-effort-filter)
+              (effort-preset (get 'org-agenda-effort-filter :preset-filter))
+              (org-agenda-tag-filter-while-redo (or tag-filter tag-preset))
+              (cols org-agenda-columns-active)
+              (line (org-current-line))
+              (window-line (- line (org-current-line (window-start))))
+              (lprops (get 'org-agenda-redo-command 'org-lprops))
+              (redo-cmd (get-text-property p 'org-redo-cmd))
+              (last-args (get-text-property p 'org-last-args))
+              (org-agenda-overriding-cmd (get-text-property p 'org-series-cmd))
+              (org-agenda-overriding-cmd-arguments
+               (unless (eq all t)
+                 (cond ((listp last-args)
+                        (cons (or cpa (car last-args)) (cdr last-args)))
+                       ((stringp last-args)
+                        last-args))))
+              (series-redo-cmd (get-text-property p 'org-series-redo-cmd)))
+         (put 'org-agenda-tag-filter :preset-filter nil)
+         (put 'org-agenda-category-filter :preset-filter nil)
+         (put 'org-agenda-regexp-filter :preset-filter nil)
+         (put 'org-agenda-effort-filter :preset-filter nil)
+         (and cols (org-columns-quit))
+         (message "Rebuilding agenda buffer...")
+         (if series-redo-cmd
+             (eval series-redo-cmd)
+           (org-let lprops redo-cmd))
+         (setq org-agenda-undo-list nil
+               org-agenda-pending-undo-list nil
+               org-agenda-tag-filter tag-filter
+               org-agenda-category-filter cat-filter
+               org-agenda-regexp-filter re-filter
+               org-agenda-effort-filter effort-filter
+               org-agenda-top-headline-filter top-hl-filter)
+         (message "Rebuilding agenda buffer...done")
+         (put 'org-agenda-tag-filter :preset-filter tag-preset)
+         (put 'org-agenda-category-filter :preset-filter cat-preset)
+         (put 'org-agenda-regexp-filter :preset-filter re-preset)
+         (put 'org-agenda-effort-filter :preset-filter effort-preset)
+         (let ((tag (or tag-filter tag-preset))
+               (cat (or cat-filter cat-preset))
+               (effort (or effort-filter effort-preset))
+               (re (or re-filter re-preset)))
+           (when tag (org-agenda-filter-apply tag 'tag t))
+           (when cat (org-agenda-filter-apply cat 'category))
+           (when effort (org-agenda-filter-apply effort 'effort))
+           (when re  (org-agenda-filter-apply re 'regexp)))
+         (and top-hl-filter (org-agenda-filter-top-headline-apply top-hl-filter))
+         (and cols (called-interactively-p 'any) (org-agenda-columns))
+         (org-goto-line line))))
 
 ;;; Org Archive
   ;; Tell org where to archive completed tasks
@@ -567,11 +614,17 @@ _vr_ reset      ^^                       ^^                 ^^
   ;; get a completing read of all headings up to three levels deep in all
   ;; files in =org-agenda-files=. You can also refile to the top header in a
   ;; document and create new parents.
-  (setq org-refile-targets '((org-agenda-files :maxlevel . 8)
-                             ("/Users/roambot/.emacs.d/config.org" :maxlevel . 8)))
+  (setq org-refile-targets '((nil :maxlevel . 9)
+                             (org-agenda-files :maxlevel . 8)))
   (setq org-refile-use-outline-path 'file)
   (setq org-outline-path-complete-in-steps nil)
   (setq org-refile-allow-creating-parent-nodes 'confirm)
+
+  ;; fix refile
+  (defun cpm/fix-org-refile ()
+    (interactive)
+    (shell-command-to-string "cd ~/.emacs.d/.local/straight/build && find org*/*.elc -print0 | xargs -0 rm")
+    (org-reload))
 
 ;;; Open Files in Default Application
   ;;Open files in their default applications (ms word being the prime example)
@@ -579,9 +632,8 @@ _vr_ reset      ^^                       ^^                 ^^
         '(("\\.docx\\'" . default)
           ("\\.mm\\'" . default)
           ("\\.x?html?\\'" . default)
-          ("\\.pdf\\'" . default)
+          ("\\.pdf\\'" . emacs)
           (auto-mode . emacs)))
-  (general-define-key "C-c a" #'org-agenda)
 
   ;; Open bookends file links in bookends
   (org-add-link-type
@@ -590,197 +642,22 @@ _vr_ reset      ^^                       ^^                 ^^
     "run bookends link in org files"
     (shell-command-to-string (concat "open bookends:" path)))
 
-
-;;; End Use-Package Config
-  ;; end use-package config settings
+;;; End Org Use-Package Config
+  ;; end org use-package config settings
   )
-;;; Org Babel
-;; org babel source block settings
-(setq org-src-fontify-natively t
-      org-src-window-setup 'other-window
-      org-src-tab-acts-natively nil
-      org-src-strip-leading-and-trailing-blank-lines t)
-
-;; Avoid `org-babel-do-load-languages' since it does an eager require.
-(use-package ob-python
-  :defer t
-  :ensure org-plus-contrib
-  :commands (org-babel-execute:python)
-  :config
-  (progn
-    (setq org-babel-python-command "python3"))) ;Default to python 3.x
-
-(use-package ob-ditaa
-  :ensure nil
-  :defer t
-  :config
-  (progn
-    ;; http://pages.sachachua.com/.emacs.d/Sacha.html
-    (setq org-ditaa-jar-path (expand-file-name
-                              "ditaa.jar"
-                              (concat user-emacs-directory "software/")))))
-
-(use-package ob-plantuml
-  :ensure nil
-  :defer t
-  :config
-  (progn
-    (setq org-plantuml-jar-path (expand-file-name
-                                 "plantuml.jar"
-                                 (concat user-emacs-directory "software/")))
-
-    (defun cpm/advice-org-babel-execute:plantuml (orig-fun &rest args)
-      "Force `shell-file-name' to be bash as the \">\" operator is used for redirection.
-
-If this forcing is not done, and if `shell-file-name' is tcsh,
-\">\" does not work.  When trying to overwrite files, we get a
-\"File exists\" error, and \">!\" would need to be used instead.
-
-Instead it's simpler to use bash."
-      (let ((shell-file-name (executable-find "bash")))
-        (apply orig-fun args)))
-    (advice-add 'org-babel-execute:plantuml :around #'cpm/advice-org-babel-execute:plantuml)))
-
-(use-package ob-shell
-  :defer t
-  :ensure org-plus-contrib
-  :commands
-  (org-babel-execute:sh
-   org-babel-expand-body:sh
-   org-babel-execute:bash
-   org-babel-expand-body:bash))
-
-(use-package ob-lisp
-  :defer t
-  :ensure org-plus-contrib
-  :commands (org-babel-execute:lisp))
-
-(use-package ob-latex
-  :defer t
-  :ensure org-plus-contrib
-  :commands
-  (org-babel-execute:latex))
-
-;;; Org Babel Tangle
-(use-package ob-tangle
-  :ensure nil
-  :defer t
-  :config
-  (progn
-    ;; Trailing whitespace management
-    ;; Delete trailing whitespace in tangled buffer and save it.
-    (add-hook 'org-babel-post-tangle-hook #'delete-trailing-whitespace)
-    (add-hook 'org-babel-post-tangle-hook #'save-buffer :append)))
-
-;;; Org Bullets
-;; Replace org-bullets since it is no longer maintained
-(use-package org-superstar
-  :hook (org-mode . org-superstar-mode)
-  :config
-  (setq org-superstar-headline-bullets-list '("⚫" "◉" "⁂" "❖" "✮" "✱" "⚫" "✸"))
-  (setq org-superstar-prettify-item-bullets t)
-  ;; see https://unicode-table.com/en/25C9/ for ideas
-  (setq org-superstar-item-bullet-alist
-        '((?* . ?○)
-          (?+ . ?◉)
-          (?- . ?●))))
-
-;; Demote sequence for list bullets
-(setq org-list-demote-modify-bullet '(("+" . "-") ("-" . "+") ("*" . "+")))
-;; Increase sub-item indentation
-(setq org-list-indent-offset 1)
-
-;;; Org Prettify Source Blocks
-;; Make source blocks look better. Courtesy of
-;; [[https://pank.eu/blog/pretty-babel-src-blocks.html][Rasmus Pank Roulund]]. Last
-;; updated: 2018-04-06
-
-(with-eval-after-load 'org
-  (defvar-local rasmus/org-at-src-begin -1
-    "Variable that holds whether last position was a ")
-
-  (defvar rasmus/ob-header-symbol ?☰
-    "Symbol used for babel headers")
-
-  (defun rasmus/org-prettify-src--update ()
-    (let ((case-fold-search t)
-          (re "^[ \t]*#\\+begin_src[ \t]+[^ \f\t\n\r\v]+[ \t]*")
-          found)
-      (save-excursion
-        (goto-char (point-min))
-        (while (re-search-forward re nil t)
-          (goto-char (match-end 0))
-          (let ((args (org-trim
-                       (buffer-substring-no-properties (point)
-                                                       (line-end-position)))))
-            (when (org-string-nw-p args)
-              (let ((new-cell (cons args rasmus/ob-header-symbol)))
-                (cl-pushnew new-cell prettify-symbols-alist :test #'equal)
-                (cl-pushnew new-cell found :test #'equal)))))
-        (setq prettify-symbols-alist
-              (cl-set-difference prettify-symbols-alist
-                                 (cl-set-difference
-                                  (cl-remove-if-not
-                                   (lambda (elm)
-                                     (eq (cdr elm) rasmus/ob-header-symbol))
-                                   prettify-symbols-alist)
-                                  found :test #'equal)))
-        ;; Clean up old font-lock-keywords.
-        (font-lock-remove-keywords nil prettify-symbols--keywords)
-        (setq prettify-symbols--keywords (prettify-symbols--make-keywords))
-        (font-lock-add-keywords nil prettify-symbols--keywords)
-        (while (re-search-forward re nil t)
-          (font-lock-flush (line-beginning-position) (line-end-position))))))
-
-  (defun rasmus/org-prettify-src ()
-    "Hide src options via `prettify-symbols-mode'.
-
-    `prettify-symbols-mode' is used because it has uncollpasing. It's
-    may not be efficient."
-    (let* ((case-fold-search t)
-           (at-src-block (save-excursion
-                           (beginning-of-line)
-                           (looking-at "^[ \t]*#\\+begin_src[ \t]+[^ \f\t\n\r\v]+[ \t]*"))))
-      ;; Test if we moved out of a block.
-      (when (or (and rasmus/org-at-src-begin
-                     (not at-src-block))
-                ;; File was just opened.
-                (eq rasmus/org-at-src-begin -1))
-        (rasmus/org-prettify-src--update))
-      ;; Remove composition if at line; doesn't work properly.
-      ;; (when at-src-block
-      ;;   (with-silent-modifications
-      ;;     (remove-text-properties (match-end 0)
-      ;;                             (1+ (line-end-position))
-      ;;                             '(composition))))
-      (setq rasmus/org-at-src-begin at-src-block)))
-
-  (defun rasmus/org-prettify-symbols ()
-    (mapc (apply-partially 'add-to-list 'prettify-symbols-alist)
-          (cl-reduce 'append
-                     (mapcar (lambda (x) (list x (cons (upcase (car x)) (cdr x))))
-                             `(("#+begin_src" . ?╦) ;; ➤ 🖝 ➟ ➤ ✎ ✎
-                               ("#+end_src"   . ?╩) ;; □
-                               ("#+header:" . ,rasmus/ob-header-symbol)
-                               ("#+begin_comment" . ?✎)
-                               ("#+end_comment" . ?✎)
-                               ("#+begin_notes" . ?➤)
-                               ("#+end_notes" . ?➤)
-                               ("#+begin_quote" . ?»)
-                               ("#+end_quote" . ?«)))))
-    (turn-on-prettify-symbols-mode)
-    (add-hook 'post-command-hook 'rasmus/org-prettify-src t t))
-  (add-hook 'org-mode-hook #'rasmus/org-prettify-symbols))
-
-
 ;;; Org-Goto
 ;; Make counsel display org headings nicely.
-(with-eval-after-load 'org
-  (setq counsel-outline-display-style 'path)
-  (setq counsel-outline-path-separator " ➜ ")
-  (setq counsel-outline-face-style 'org)
-  (general-define-key :keymaps 'org-mode-map "C-c C-j" #'counsel-org-goto)
-  (general-define-key :keymaps 'org-mode-map "C-u C-c C-j" #'counsel-org-goto-all))
+;; (with-eval-after-load 'org
+;;   (setq counsel-outline-display-style 'path)
+;;   (setq counsel-outline-path-separator " ➜ ")
+;;   (setq counsel-outline-face-style 'org))
+;; (general-define-key :keymaps 'org-mode-map "C-c C-j" #'counsel-org-goto)
+;; (general-define-key :keymaps 'org-mode-map "C-u C-c C-j" #'counsel-org-goto-all))
+
+;;; Org Indirect Buffer
+(setq org-indirect-buffer-display 'current-window)
+;; Some advice to automatically switch to a new indirect buffer upon creation
+;; (defadvice org-tree-to-indirect-buffer (after org-tree-to-indirect-buffer-after activate) (other-window 1))
 
 ;;; Org Functions
 ;;;; Org Fill Functions
@@ -828,11 +705,25 @@ Instead it's simpler to use bash."
     (org-backward-heading-same-level 1))
   (org-narrow-to-subtree))
 
+;;;; Clone and Narrow
+(defun cpm/clone-buffer-and-narrow ()
+  "Clone buffer and narrow outline tree"
+  (interactive)
+  (let ((buf (clone-indirect-buffer-other-window nil nil)))
+    (with-current-buffer buf
+      (cond ((derived-mode-p 'org-mode)
+             (org-narrow-to-element))
+            ((derived-mode-p 'markdown-mode)
+             (markdown-narrow-to-subtree))))
+    (switch-to-buffer-other-window buf)))
+
 ;;;; Goto Org Files
 (defun cpm/goto-org-files ()
   "goto org-files directory"
   (interactive)
-  (counsel-find-file org-directory))
+  (require 'projectile)
+  (projectile-find-file-in-directory org-directory))
+;; (ido-find-file-in-dir org-directory))
 (defun cpm/goto-inbox.org ()
   "goto org-inbox"
   (interactive)
@@ -876,6 +767,7 @@ Instead it's simpler to use bash."
 ;; http://pragmaticemacs.com/emacs/export-org-mode-headlines-to-separate-files/ ; see also:
 ;; http://emacs.stackexchange.com/questions/2259/how-to-export-top-level-headings-of-org-mode-buffer-to-separate-files
 
+;; FIXME: neither of these functions work right now for some reason.
 (defun cpm/org-export-headlines-to-docx ()
   "Export all subtrees that are *not* tagged with :noexport: to
     separate files.
@@ -911,6 +803,7 @@ Instead it's simpler to use bash."
     Subtrees that do not have the :EXPORT_FILE_NAME: property set
     are exported to a filename derived from the headline text."
   (interactive)
+  (require 'ox-pandoc)
   (save-buffer)
   (let ((modifiedp (buffer-modified-p)))
     (save-excursion
@@ -1412,754 +1305,138 @@ is non-nil."
                       (org-link-escape (org-link-decode uri)))))))))))
 
 
-;;; Org-Reveal
-(use-package ox-reveal
-  :commands (org-reveal-export-current-subtree org-reveal-export-to-html-and-browse)
-  :after ox
-  :demand t
-  :load-path (lambda () (concat cpm-elisp-dir "ox-reveal"))
-  :config
-  (setq org-reveal-root (concat "file://" (getenv "HOME") "/bin/reveal.js")
-        org-reveal-theme "moon"
-        org-reveal-default-frag-style "roll-in"
-        org-reveal-hlevel 2
-        ))
+;;;; Org Table Wrap
+;; see https://emacs.stackexchange.com/a/30871/11934
+(defun org-table-wrap-to-width (width)
+  "Wrap current column to WIDTH."
+  (interactive (list (read-number "Enter column width: ")))
+  (org-table-check-inside-data-field)
+  (org-table-align)
 
-(defun cpm/narrowed-subtree-to-html ()
-  "export narrowed tree to html"
+  (let (cline (ccol (org-table-current-column)) new-row-count (more t))
+    (org-table-goto-line 1)
+    (org-table-goto-column ccol)
+
+    (while more
+      (setq cline (org-table-current-line))
+
+      ;; Cut current field
+      (org-table-copy-region (point) (point) 'cut)
+
+      ;; Justify for width
+      (setq org-table-clip
+            (mapcar 'list (org-wrap (caar org-table-clip) width nil)))
+
+      ;; Add new lines and fill
+      (setq new-row-count (1- (length org-table-clip)))
+      (if (> new-row-count 0)
+          (org-table-insert-n-row-below new-row-count))
+      (org-table-goto-line cline)
+      (org-table-goto-column ccol)
+      (org-table-paste-rectangle)
+      (org-table-goto-line (+ cline new-row-count))
+
+      ;; Move to next line
+      (setq more (org-table-goto-line (+ cline new-row-count 1)))
+      (org-table-goto-column ccol))
+
+    (org-table-goto-line 1)
+    (org-table-goto-column ccol)))
+
+(defun org-table-insert-n-row-below (n)
+  "Insert N new lines below the current."
+  (let* ((line (buffer-substring (point-at-bol) (point-at-eol)))
+         (new (org-table-clean-line line)))
+    ;; Fix the first field if necessary
+    (if (string-match "^[ \t]*| *[#$] *|" line)
+        (setq new (replace-match (match-string 0 line) t t new)))
+    (beginning-of-line 2)
+    (setq new
+          (apply 'concat (make-list n (concat new "\n"))))
+    (let (org-table-may-need-update) (insert-before-markers new))  ;;; remove?
+    (beginning-of-line 0)
+    (re-search-forward "| ?" (point-at-eol) t)
+    (and (or org-table-may-need-update org-table-overlay-coordinates) ;;; remove?
+         (org-table-align))
+    (org-table-fix-formulas "@" nil (1- (org-table-current-dline)) n)))
+;;;; Org to Beamer PDF
+(defun cpm/org-export-to-beamer-pdf-open ()
+  "Export org subtree to beamer pdf and open"
   (interactive)
-  (org-reveal-export-current-subtree)
-  (org-narrow-to-subtree))
+  (universal-argument)
+  (universal-argument-more)
+  (org-open-file (org-beamer-export-to-pdf nil t)))
 
-(fset 'cpm/reveal-to-html-open
-      "\C-c\C-e\C-sRB")
-
-;;; Org GTD
-;;;; GTD Project Functions
-(defun cpm/org-goto-todo ()
+;;;; Org to beamer slides or handout
+(defun cpm/org-export-beamer-presentation ()
   (interactive)
-  (find-file (concat org-directory "todo.org"))
-  (widen)
-  (goto-char (point-min)))
+  (save-excursion
+    (goto-char (point-min))
+    (org-beamer-export-to-pdf nil t nil nil '(:latex-class "beamer-presentation"))))
 
-(defun cpm/org-goto-inbox ()
+;; (org-open-file (org-beamer-export-to-pdf nil t nil nil '(:latex-class "beamer-presentation")))))
+
+(defun cpm/org-export-beamer-handout ()
   (interactive)
-  (find-file (concat org-directory "inbox.org"))
-  (widen)
-  (goto-char (point-min))
-  (beginning-of-line))
+  (save-excursion
+    (goto-char (point-min))
+    (org-open-file (org-beamer-export-to-pdf nil t nil nil '(:latex-class "beamer-handout")))))
 
-;; TODO: this isn't working
-(defun cpm/project-overview ()
+
+;;;; Org Export Last Subtree
+;; bind f5 to keyboard macro of export-last-subtree
+(fset 'export-last-subtree
+      "\C-u\C-c\C-e")
+
+(eval-after-load "org"
+  '(progn
+     (define-key org-mode-map (kbd "<f5>") 'export-last-subtree)))
+
+
+
+
+;;;; Org Tag Selection
+
+(defun cpm/org-select-tags-completing-read ()
+  "Select tags to add to headline."
   (interactive)
-  (cpm/goto-projects.org)
-  (org-narrow-to-subtree)
-  (org-columns))
-;;set defaults to nothing
-(setq org-stuck-projects (quote ("" nil nil "")))
+  (let* ((current (org-get-tags (point)))
+         (selected (completing-read-multiple "Select org tag(s): " (org-get-buffer-tags))))
+    (alet (-uniq (append (-difference current selected)
+                         (-difference selected current)))
+      (org-set-tags it))))
 
-;;;; Stuck Projects
-;; I'm following [[http://doc.norang.ca/org-mode.html#Projects][Bert Hansen's]] lead on this
-(defun cpm/list-stuck-projects-in-buffer ()
+;;;; Org Copy Link
+;; see https://emacs.stackexchange.com/a/63038/11934
+(defun cpm/org-link-copy-at-point ()
   (interactive)
-  (bh/skip-non-stuck-projects)
-  (org-agenda nil "s" 'subtree))
+  (save-excursion
+    (let* ((ol-regex "\\[\\[.*?:.*?\\]\\(\\[.*?\\]\\)?\\]")
+           (beg (re-search-backward "\\[\\["))
+           (end (re-search-forward ol-regex))
+           (link-string (buffer-substring-no-properties (match-beginning 0) (match-end 0))))
+      (kill-new link-string)
+      (message "Org link %s is copied." link-string))))
 
-(defun cpm/list-all-stuck-projects ()
+;;;; Remove Org Links
+;; https://emacs.stackexchange.com/a/10714/11934
+(defun cpm/org-replace-link-by-link-description ()
+  "Replace an org link by its description or, if empty, its address"
   (interactive)
-  (org-agenda nil "s"))
-
-;;;;; Helper Functions
-(defun bh/is-project-p ()
-  "Any task with a todo keyword subtask"
-  (save-restriction
-    (widen)
-    (let ((has-subtask)
-          (subtree-end (save-excursion (org-end-of-subtree t)))
-          (is-a-task (member (nth 2 (org-heading-components)) org-todo-keywords-1)))
+  (if (org-in-regexp org-link-bracket-re 1)
       (save-excursion
-        (forward-line 1)
-        (while (and (not has-subtask)
-                    (< (point) subtree-end)
-                    (re-search-forward "^\*+ " subtree-end t))
-          (when (member (org-get-todo-state) org-todo-keywords-1)
-            (setq has-subtask t))))
-      (and is-a-task has-subtask))))
+        (let ((remove (list (match-beginning 0) (match-end 0)))
+              (description
+               (if (match-end 2)
+                   (org-match-string-no-properties 2)
+                 (org-match-string-no-properties 1))))
+          (apply 'delete-region remove)
+          (insert description)))))
 
-(defun bh/is-project-subtree-p ()
-  "Any task with a todo keyword that is in a project subtree.
-    Callers of this function already widen the buffer view."
-  (let ((task (save-excursion (org-back-to-heading 'invisible-ok)
-                              (point))))
-    (save-excursion
-      (bh/find-project-task)
-      (if (equal (point) task)
-          nil
-        t))))
+;;;; Org Contrib
+(use-package org-contrib
+  :straight t
+  :after org)
 
-(defun bh/is-task-p ()
-  "Any task with a todo keyword and no subtask"
-  (save-restriction
-    (widen)
-    (let ((has-subtask)
-          (subtree-end (save-excursion (org-end-of-subtree t)))
-          (is-a-task (member (nth 2 (org-heading-components)) org-todo-keywords-1)))
-      (save-excursion
-        (forward-line 1)
-        (while (and (not has-subtask)
-                    (< (point) subtree-end)
-                    (re-search-forward "^\*+ " subtree-end t))
-          (when (member (org-get-todo-state) org-todo-keywords-1)
-            (setq has-subtask t))))
-      (and is-a-task (not has-subtask)))))
-
-(defun bh/is-subproject-p ()
-  "Any task which is a subtask of another project"
-  (let ((is-subproject)
-        (is-a-task (member (nth 2 (org-heading-components)) org-todo-keywords-1)))
-    (save-excursion
-      (while (and (not is-subproject) (org-up-heading-safe))
-        (when (member (nth 2 (org-heading-components)) org-todo-keywords-1)
-          (setq is-subproject t))))
-    (and is-a-task is-subproject)))
-
-(defun bh/list-sublevels-for-projects-indented ()
-  "Set org-tags-match-list-sublevels so when restricted to a subtree we list all subtasks.
-    This is normally used by skipping functions where this variable is already local to the agenda."
-  (if (marker-buffer org-agenda-restrict-begin)
-      (setq org-tags-match-list-sublevels 'indented)
-    (setq org-tags-match-list-sublevels nil))
-  nil)
-
-(defun bh/list-sublevels-for-projects ()
-  "Set org-tags-match-list-sublevels so when restricted to a subtree we list all subtasks.
-    This is normally used by skipping functions where this variable is already local to the agenda."
-  (if (marker-buffer org-agenda-restrict-begin)
-      (setq org-tags-match-list-sublevels t)
-    (setq org-tags-match-list-sublevels nil))
-  nil)
-
-(defvar bh/hide-scheduled-and-waiting-next-tasks t)
-
-(defun bh/toggle-next-task-display ()
-  (interactive)
-  (setq bh/hide-scheduled-and-waiting-next-tasks (not bh/hide-scheduled-and-waiting-next-tasks))
-  (when  (equal major-mode 'org-agenda-mode)
-    (org-agenda-redo))
-  (message "%s WAITING and SCHEDULED NEXT Tasks" (if bh/hide-scheduled-and-waiting-next-tasks "Hide" "Show")))
-
-(defun bh/skip-stuck-projects ()
-  "Skip trees that are not stuck projects"
-  (save-restriction
-    (widen)
-    (let ((next-headline (save-excursion (or (outline-next-heading) (point-max)))))
-      (if (bh/is-project-p)
-          (let* ((subtree-end (save-excursion (org-end-of-subtree t)))
-                 (has-next ))
-            (save-excursion
-              (forward-line 1)
-              (while (and (not has-next) (< (point) subtree-end) (re-search-forward "^\\*+ NEXT " subtree-end t))
-                (unless (member "WAITING" (org-get-tags))
-                  (setq has-next t))))
-            (if has-next
-                nil
-              next-headline)) ; a stuck project, has subtasks but no next task
-        nil))))
-
-(defun bh/skip-non-stuck-projects ()
-  "Skip trees that are not stuck projects"
-  ;; (bh/list-sublevels-for-projects-indented)
-  (save-restriction
-    (widen)
-    (let ((next-headline (save-excursion (or (outline-next-heading) (point-max)))))
-      (if (bh/is-project-p)
-          (let* ((subtree-end (save-excursion (org-end-of-subtree t)))
-                 (has-next ))
-            (save-excursion
-              (forward-line 1)
-              (while (and (not has-next) (< (point) subtree-end) (re-search-forward "^\\*+ NEXT " subtree-end t))
-                (unless (member "WAITING" (org-get-tags))
-                  (setq has-next t))))
-            (if has-next
-                next-headline
-              nil)) ; a stuck project, has subtasks but no next task
-        next-headline))))
-
-(defun bh/skip-non-projects ()
-  "Skip trees that are not projects"
-  ;; (bh/list-sublevels-for-projects-indented)
-  (if (save-excursion (bh/skip-non-stuck-projects))
-      (save-restriction
-        (widen)
-        (let ((subtree-end (save-excursion (org-end-of-subtree t))))
-          (cond
-           ((bh/is-project-p)
-            nil)
-           ((and (bh/is-project-subtree-p) (not (bh/is-task-p)))
-            nil)
-           (t
-            subtree-end))))
-    (save-excursion (org-end-of-subtree t))))
-
-(defun bh/skip-non-tasks ()
-  "Show non-project tasks.
-    Skip project and sub-project tasks, habits, and project related tasks."
-  (save-restriction
-    (widen)
-    (let ((next-headline (save-excursion (or (outline-next-heading) (point-max)))))
-      (cond
-       ((bh/is-task-p)
-        nil)
-       (t
-        next-headline)))))
-
-(defun bh/skip-project-trees-and-habits ()
-  "Skip trees that are projects"
-  (save-restriction
-    (widen)
-    (let ((subtree-end (save-excursion (org-end-of-subtree t))))
-      (cond
-       ((bh/is-project-p)
-        subtree-end)
-       ((org-is-habit-p)
-        subtree-end)
-       (t
-        nil)))))
-
-(defun bh/skip-projects-and-habits-and-single-tasks ()
-  "Skip trees that are projects, tasks that are habits, single non-project tasks"
-  (save-restriction
-    (widen)
-    (let ((next-headline (save-excursion (or (outline-next-heading) (point-max)))))
-      (cond
-       ((org-is-habit-p)
-        next-headline)
-       ((and bh/hide-scheduled-and-waiting-next-tasks
-             (member "WAITING" (org-get-tags)))
-        next-headline)
-       ((bh/is-project-p)
-        next-headline)
-       ((and (bh/is-task-p) (not (bh/is-project-subtree-p)))
-        next-headline)
-       (t
-        nil)))))
-
-(defun bh/skip-project-tasks-maybe ()
-  "Show tasks related to the current restriction.
-    When restricted to a project, skip project and sub project tasks, habits, NEXT tasks, and loose tasks.
-    When not restricted, skip project and sub-project tasks, habits, and project related tasks."
-  (save-restriction
-    (widen)
-    (let* ((subtree-end (save-excursion (org-end-of-subtree t)))
-           (next-headline (save-excursion (or (outline-next-heading) (point-max))))
-           (limit-to-project (marker-buffer org-agenda-restrict-begin)))
-      (cond
-       ((bh/is-project-p)
-        next-headline)
-       ((org-is-habit-p)
-        subtree-end)
-       ((and (not limit-to-project)
-             (bh/is-project-subtree-p))
-        subtree-end)
-       ((and limit-to-project
-             (bh/is-project-subtree-p)
-             (member (org-get-todo-state) (list "NEXT")))
-        subtree-end)
-       (t
-        nil)))))
-
-(defun bh/skip-project-tasks ()
-  "Show non-project tasks.
-    Skip project and sub-project tasks, habits, and project related tasks."
-  (save-restriction
-    (widen)
-    (let* ((subtree-end (save-excursion (org-end-of-subtree t))))
-      (cond
-       ((bh/is-project-p)
-        subtree-end)
-       ((org-is-habit-p)
-        subtree-end)
-       ((bh/is-project-subtree-p)
-        subtree-end)
-       (t
-        nil)))))
-
-(defun bh/skip-non-project-tasks ()
-  "Show project tasks.
-    Skip project and sub-project tasks, habits, and loose non-project tasks."
-  (save-restriction
-    (widen)
-    (let* ((subtree-end (save-excursion (org-end-of-subtree t)))
-           (next-headline (save-excursion (or (outline-next-heading) (point-max)))))
-      (cond
-       ((bh/is-project-p)
-        next-headline)
-       ((org-is-habit-p)
-        subtree-end)
-       ((and (bh/is-project-subtree-p)
-             (member (org-get-todo-state) (list "NEXT")))
-        subtree-end)
-       ((not (bh/is-project-subtree-p))
-        subtree-end)
-       (t
-        nil)))))
-
-(defun bh/skip-projects-and-habits ()
-  "Skip trees that are projects and tasks that are habits"
-  (save-restriction
-    (widen)
-    (let ((subtree-end (save-excursion (org-end-of-subtree t))))
-      (cond
-       ((bh/is-project-p)
-        subtree-end)
-       ((org-is-habit-p)
-        subtree-end)
-       (t
-        nil)))))
-
-(defun bh/skip-non-subprojects ()
-  "Skip trees that are not projects"
-  (let ((next-headline (save-excursion (outline-next-heading))))
-    (if (bh/is-subproject-p)
-        nil
-      next-headline)))
-
-;;;; GTD Areas
-;; TODO: need to rethink this
-(defun cpm/go-to-areas ()
-  (interactive)
-  (find-file (concat org-directory "todo.org"))
-  (widen)
-  (goto-char (point-min))
-  (re-search-forward "* Areas")
-  (beginning-of-line))
-
-(defun cpm/areas-overview ()
-  (interactive)
-  (go-to-areas)
-  (org-narrow-to-subtree)
-  (org-columns))
-
-;;;; Random Notes
-;; FIXME: Need to fix the list of candidates...
-(use-package org-randomnote
-  :commands (org-randomnote org-randomnote--go-to-random-header org-randomnote--get-random-file org-randomnote--get-random-subtree))
-
-;;; Org Rifle
-;; Search [[https://github.com/alphapapa/helm-org-rifle][rapidly]] through org files using helm
-(use-package helm-org-rifle
-  :commands (helm-org-rifle helm-org-rifle-agenda-files helm-org-rifle-org-directory)
-  :config
-  ;; fix helm taking over various functions after being activated
-  (add-hook 'helm-org-rifle-after-command-hook (lambda () (helm-mode -1))))
-
-;;; Org-Download
-;; Drag and drop images to Emacs org-mode. Courtesy of [[https://github.com/abo-abo/org-download][abo-abo]].
-(use-package org-download
-  :commands (org-download-yank org-download-screenshot org-download-image)
-  :config
-  (setq org-download-method 'directory
-        org-download-image-dir (concat org-directory "org-pictures/")
-        org-download-image-latex-width 500
-        org-download-timestamp "%Y-%m-%d"))
-
-;;; Org Pomodoro
-;; Helps with time tracking
-(use-package org-pomodoro
-  :commands org-pomodoro
-  :init
-  (progn
-    (setq org-pomodoro-audio-player "/usr/bin/afplay")))
-
-;;; Org Indirect Buffer
-(setq org-indirect-buffer-display 'current-window)
-;; Some advice to automatically switch to a new indirect buffer upon creation
-;; (defadvice org-tree-to-indirect-buffer (after org-tree-to-indirect-buffer-after activate) (other-window 1))
-
-;;; Org Numbers Overlay
-;; [[https://github.com/larkery/emacs/blob/master/site-lisp/org-numbers-overlay.el][This]] is a useful minor-mode to number org-mode headings. It came up in
-;; the course of [[https://www.reddit.com/r/emacs/comments/6crtzw/it_is_possible_to_display_numbers_at_the/][this reddit]] discussion.
-(define-minor-mode org-numbers-overlay-mode
-  "Add overlays to org headings which number them"
-  nil " *1." nil
-
-  (let ((hooks '(after-save-hook
-                 org-insert-heading-hook))
-        (funcs '(org-promote
-                 org-cycle-level
-                 org-promote-subtree
-                 org-demote
-                 org-demote-subtree
-                 org-move-subtree-up
-                 org-move-subtree-down
-                 org-move-item-down
-                 org-move-item-up
-                 org-cut-subtree
-                 org-insert-todo-heading
-                 org-insert-todo-subheading
-                 org-meta-return
-                 org-set-property
-                 org-move)))
-    (if org-numbers-overlay-mode
-        (progn
-          (org-numbers-overlay-update)
-          (dolist (fn funcs)
-            (advice-add fn :after #'org-numbers-overlay-update))
-          (dolist (hook hooks)
-            (add-hook hook #'org-numbers-overlay-update)))
-
-      (progn
-        (dolist (fn funcs)
-          (advice-add fn :after #'org-numbers-overlay-update))
-        (dolist (hook hooks)
-          (remove-hook hook #'org-numbers-overlay-update))
-
-        (loop for o in (overlays-in (point-min) (point-max))
-              if (eq (overlay-get o 'type) 'org-number)
-              do (delete-overlay o))))))
-
-(defun org-numbers-overlay-update (&rest args)
-  (when org-numbers-overlay-mode
-    (let ((levels (make-vector 10 0)))
-      (save-excursion
-        (widen)
-        (goto-char (point-min))
-        (while (outline-next-heading)
-          (if (assoc "UNNUMBERED" (org-entry-properties))
-              ;; if it's unnumbered delete any overlays we have on it
-              (loop for o in (overlays-in (point)
-                                          (save-excursion (end-of-line) (point)))
-                    if (eq (overlay-get o 'type) 'org-number)
-                    do (delete-overlay o))
-            ;; if it's not unnumbered add a number or update it
-            (let* ((detail (org-heading-components))
-                   (level (- (car detail) 1))
-                   (lcounter (1+ (aref levels level)))
-                   (o (or (loop for o in (overlays-in (point)
-                                                      (save-excursion (end-of-line) (point)))
-                                if (eq (overlay-get o 'type) 'org-number)
-                                return o)
-                          (make-overlay (point) (+ (point) (car detail))))))
-              (aset levels level lcounter)
-              (loop for i from (1+ level) to 9
-                    do (aset levels i 0))
-              (overlay-put o 'type 'org-number)
-              (overlay-put o 'evaporate t)
-              (overlay-put o 'after-string
-                           (let (s)
-                             (loop for i across levels
-                                   until (zerop i)
-                                   do (setf s (if s (format "%s.%d" s i)
-                                                (format " %d" i))
-                                            ))
-                             s)))))))))
-(provide 'org-numbers-overlay)
-
-;;; Org Export
-;; Some useful settings
-;;;; Backends
-(setq org-export-backends '(ascii html icalendar latex odt pandoc hugo md))
-
-;;;; Ox-Pandoc
-(use-package ox-pandoc
-  :after ox
-  :config
-  ;; default options for all output formats
-  (setq org-pandoc-command (expand-file-name "/usr/local/bin/pandoc"))
-  (setq org-pandoc-options '((standalone . t)))
-  ;; cancel above settings only for 'docx' format
-  (setq org-pandoc-options-for-docx '((standalone . nil)))
-  ;; special settings for beamer-pdf and latex-pdf exporters
-  (setq org-pandoc-options-for-beamer-pdf '((pdf-engine . "xelatex")))
-  (setq org-pandoc-options-for-latex-pdf '((pdf-engine . "xelatex")))
-  (setq org-pandoc-format-extensions '(org+smart)))
-
-;;;;; Export Menu Options
-(defcustom org-pandoc-menu-entry
-  '(
-    ;;(?0 "to jats." org-pandoc-export-to-jats)
-    ;;(?0 "to jats and open." org-pandoc-export-to-jats-and-open)
-    ;;(?  "as jats." org-pandoc-export-as-jats)
-    ;;(?1 "to epub2 and open." org-pandoc-export-to-epub2-and-open)
-    ;;(?! "to epub2." org-pandoc-export-to-epub2)
-    ;;(?2 "to tei." org-pandoc-export-to-tei)
-    ;;(?2 "to tei and open." org-pandoc-export-to-tei-and-open)
-    ;;(?" "as tei." org-pandoc-export-as-tei)
-        ;;(?3 "to markdown_mmd." org-pandoc-export-to-markdown_mmd)
-        ;;(?3 "to markdown_mmd and open." org-pandoc-export-to-markdown_mmd-and-open)
-        ;;(?# "as markdown_mmd." org-pandoc-export-as-markdown_mmd)
-        ;;(?4 "to html5." org-pandoc-export-to-html5)
-        (?4 "to html5 and open." org-pandoc-export-to-html5-and-open)
-        (?$ "as html5." org-pandoc-export-as-html5)
-        (?5 "to html5-pdf and open." org-pandoc-export-to-html5-pdf-and-open)
-        (?% "to html5-pdf." org-pandoc-export-to-html5-pdf)
-        ;;(?6 "to markdown_phpextra." org-pandoc-export-to-markdown_phpextra)
-        ;;(?6 "to markdown_phpextra and open." org-pandoc-export-to-markdown_phpextra-and-open)
-        ;;(?& "as markdown_phpextra." org-pandoc-export-as-markdown_phpextra)
-        ;;(?7 "to markdown_strict." org-pandoc-export-to-markdown_strict)
-        ;;(?7 "to markdown_strict and open." org-pandoc-export-to-markdown_strict-and-open)
-        ;;(?' "as markdown_strict." org-pandoc-export-as-markdown_strict)
-        ;;(?8 "to opendocument." org-pandoc-export-to-opendocument)
-        ;;(?8 "to opendocument and open." org-pandoc-export-to-opendocument-and-open)
-        ;;(?( "as opendocument." org-pandoc-export-as-opendocument)
-        ;;(?9 "to opml." org-pandoc-export-to-opml)
-        ;;(?9 "to opml and open." org-pandoc-export-to-opml-and-open)
-        ;;(?) "as opml." org-pandoc-export-as-opml)
-        ;;(?: "to rst." org-pandoc-export-to-rst)
-        ;;(?: "to rst and open." org-pandoc-export-to-rst-and-open)
-        ;;(?* "as rst." org-pandoc-export-as-rst)
-        ;;(?< "to slideous." org-pandoc-export-to-slideous)
-        (?< "to slideous and open." org-pandoc-export-to-slideous-and-open)
-        (?, "as slideous." org-pandoc-export-as-slideous)
-        (?= "to ms-pdf and open." org-pandoc-export-to-ms-pdf-and-open)
-        (?- "to ms-pdf." org-pandoc-export-to-ms-pdf)
-        ;;(?> "to textile." org-pandoc-export-to-textile)
-        ;;(?> "to textile and open." org-pandoc-export-to-textile-and-open)
-        ;;(?. "as textile." org-pandoc-export-as-textile)
-        ;;(?a "to asciidoc." org-pandoc-export-to-asciidoc)
-        ;;(?a "to asciidoc and open." org-pandoc-export-to-asciidoc-and-open)
-        ;;(?A "as asciidoc." org-pandoc-export-as-asciidoc)
-        (?b "to beamer-pdf and open." org-pandoc-export-to-beamer-pdf-and-open)
-        (?B "to beamer-pdf." org-pandoc-export-to-beamer-pdf)
-        (?c "to context-pdf and open." org-pandoc-export-to-context-pdf-and-open)
-        (?C "to context-pdf." org-pandoc-export-to-context-pdf)
-        ;;(?d "to docbook5." org-pandoc-export-to-docbook5)
-        (?d "to docbook5 and open." org-pandoc-export-to-docbook5-and-open)
-        (?D "as docbook5." org-pandoc-export-as-docbook5)
-        (?e "to epub3 and open." org-pandoc-export-to-epub3-and-open)
-        (?E "to epub3." org-pandoc-export-to-epub3)
-        ;;(?f "to fb2." org-pandoc-export-to-fb2)
-        ;;(?f "to fb2 and open." org-pandoc-export-to-fb2-and-open)
-        ;;(?F "as fb2." org-pandoc-export-as-fb2)
-        ;;(?g "to gfm." org-pandoc-export-to-gfm)
-        (?g "to gfm and open." org-pandoc-export-to-gfm-and-open)
-        (?G "as gfm." org-pandoc-export-as-gfm)
-        ;;(?h "to html4." org-pandoc-export-to-html4)
-        (?h "to html4 and open." org-pandoc-export-to-html4-and-open)
-        (?H "as html4." org-pandoc-export-as-html4)
-        ;;(?i "to icml." org-pandoc-export-to-icml)
-        (?i "to icml and open." org-pandoc-export-to-icml-and-open)
-        (?I "as icml." org-pandoc-export-as-icml)
-        ;;(?j "to json." org-pandoc-export-to-json)
-        (?j "to json and open." org-pandoc-export-to-json-and-open)
-        (?J "as json." org-pandoc-export-as-json)
-        ;; (?k "to markdown." org-pandoc-export-to-markdown)
-        (?k "to markdown and open." org-pandoc-export-to-markdown-and-open)
-        (?K "as markdown." org-pandoc-export-as-markdown)
-        (?l "to latex-pdf and open." org-pandoc-export-to-latex-pdf-and-open)
-        (?L "to latex-pdf." org-pandoc-export-to-latex-pdf)
-        ;;(?m "to man." org-pandoc-export-to-man)
-        (?m "to man and open." org-pandoc-export-to-man-and-open)
-        (?M "as man." org-pandoc-export-as-man)
-        ;;(?n "to native." org-pandoc-export-to-native)
-        (?n "to native and open." org-pandoc-export-to-native-and-open)
-        (?N "as native." org-pandoc-export-as-native)
-        (?o "to odt and open." org-pandoc-export-to-odt-and-open)
-        (?O "to odt." org-pandoc-export-to-odt)
-        (?p "to pptx and open." org-pandoc-export-to-pptx-and-open)
-        (?P "to pptx." org-pandoc-export-to-pptx)
-        ;;(?q "to commonmark." org-pandoc-export-to-commonmark)
-        ;;(?q "to commonmark and open." org-pandoc-export-to-commonmark-and-open)
-        ;;(?Q "as commonmark." org-pandoc-export-as-commonmark)
-        ;;(?r "to rtf." org-pandoc-export-to-rtf)
-        (?r "to rtf and open." org-pandoc-export-to-rtf-and-open)
-        (?R "as rtf." org-pandoc-export-as-rtf)
-        ;;(?s "to s5." org-pandoc-export-to-s5)
-        ;;(?s "to s5 and open." org-pandoc-export-to-s5-and-open)
-        ;;(?S "as s5." org-pandoc-export-as-s5)
-        ;;(?t "to texinfo." org-pandoc-export-to-texinfo)
-        ;;(?t "to texinfo and open." org-pandoc-export-to-texinfo-and-open)
-        ;;(?T "as texinfo." org-pandoc-export-as-texinfo)
-        ;;(?u "to dokuwiki." org-pandoc-export-to-dokuwiki)
-        (?u "to dokuwiki and open." org-pandoc-export-to-dokuwiki-and-open)
-        (?U "as dokuwiki." org-pandoc-export-as-dokuwiki)
-        ;; (?v "to revealjs." org-pandoc-export-to-revealjs)
-        (?v "to revealjs and open." org-pandoc-export-to-revealjs-and-open)
-        (?V "as revealjs." org-pandoc-export-as-revealjs)
-        ;;(?w "to mediawiki." org-pandoc-export-to-mediawiki)
-        (?w "to mediawiki and open." org-pandoc-export-to-mediawiki-and-open)
-        (?W "as mediawiki." org-pandoc-export-as-mediawiki)
-        (?x "to docx and open." org-pandoc-export-to-docx-and-open)
-        (?X "to docx." org-pandoc-export-to-docx)
-        ;;(?y "to slidy." org-pandoc-export-to-slidy)
-        (?y "to slidy and open." org-pandoc-export-to-slidy-and-open)
-        (?Y "as slidy." org-pandoc-export-as-slidy)
-        ;;(?z "to dzslides." org-pandoc-export-to-dzslides)
-        (?z "to dzslides and open." org-pandoc-export-to-dzslides-and-open)
-        (?Z "as dzslides." org-pandoc-export-as-dzslides)
-        ;;(?{ "to muse." org-pandoc-export-to-muse)
-        ;;(?{ "to muse and open." org-pandoc-export-to-muse-and-open)
-        ;;(?[ "as muse." org-pandoc-export-as-muse)
-        ;;(?} "to zimwiki." org-pandoc-export-to-zimwiki)
-        ;;(?} "to zimwiki and open." org-pandoc-export-to-zimwiki-and-open)
-        ;;(?] "as zimwiki." org-pandoc-export-as-zimwiki)
-        ;;(?~ "to haddock." org-pandoc-export-to-haddock)
-        ;;(?~ "to haddock and open." org-pandoc-export-to-haddock-and-open)
-        ;;(?^ "as haddock." org-pandoc-export-as-haddock)
-        )
-  "Pandoc menu-entry."
-  :group 'org-pandoc
-  :type 'list)
-
-;;;; Ox-Hugo
-;; [[https://github.com/kaushalmodi/ox-hugo][Export]] to Hugo with Org
-(use-package ox-hugo :after ox)
-;; (use-package ox-hugo-auto-export :ensure nil :after ox-hugo)
-
-;;;; Export Top Level Trees
-;; From a useful [[https://emacs.stackexchange.com/questions/27226/how-to-export-top-level-trees-in-an-org-file-to-corresponding-files][stack exchange]] post
-(defun cpm/org-map-entries (org-file in-tags func)
-  (let ((tags (if (stringp in-tags)
-                  (list in-tags)
-                in-tags)))
-
-    (with-temp-buffer
-      (org-mode)
-      (insert-file-contents org-file-main)
-
-      ;; Execute func at each heading that matches tags.
-      (while (< (point) (point-max))
-
-        ;; If find a heading...
-        (and (search-forward-regexp "^\* " nil "end")
-
-             ;; ...that matches the given tags...
-             (seq-reduce
-              (lambda(a b) (and a b))
-              (mapcar
-               (lambda (tag)
-                 (beginning-of-line)
-                 (search-forward-regexp
-                  (concat ":" tag ":") (line-end-position) "end"))
-               tags)
-              t)
-
-             ;; ... then execute given function with cursor at beginning of
-             ;; heading.
-             (progn
-               (beginning-of-line)
-               (save-excursion
-                 (funcall func))
-               (end-of-line)))))))
-
-;;; Org Roam (Wiki & Notes)
-;; Good notes package but a lot is still in flux
-;; see https://org-roam.readthedocs.io/en/latest/
-(eval-when-compile
-  (quelpa
-   '(org-roam :fetcher github :repo "jethrokuan/org-roam")))
-
-(use-package org-roam
-  :ensure nil
-  :commands (org-roam org-roam-new-file org-roam-find-file)
-  :after org
-  :hook
-  (;; (org-mode . org-roam-mode)
-   (after-init . org-roam--build-cache-async) ;; optional!
-   )
-  :custom
-  (org-roam-directory "~/Dropbox/Work/projects/notebook/org/")
-  ;;;; Org Roam Keybindings
-  :general
-  (:states '(normal motion)
-   (cpm/leader-keys
-     "R l"  #'org-roam
-     "R t"  #'org-roam-today
-     "R f"  #'org-roam-find-file
-     "R i"  #'org-roam-insert
-     "R g"  #'org-roam-show-graph
-     "R n"  #'org-roam-new-file
-     "R N"  #'org-roam--new-file-named))
-  :config
-  ;;;; Org Roam Formatting
-  (setq org-roam-date-filename-format "%Y-%m%d-%H%M")
-  (setq org-roam-date-title-format "%Y-%m%d-%H%M")
-
-  ;; fix org roam title conversion
-  (defun org-roam--title-to-slug (title)
-    "Convert TITLE to a filename-suitable slug."
-    (cl-flet* ((nonspacing-mark-p (char)
-                                  (eq 'Mn (get-char-code-property char 'general-category)))
-               (strip-nonspacing-marks (s)
-                                       (apply #'string (seq-remove #'nonspacing-mark-p
-                                                                   (ucs-normalize-NFD-string s))))
-               (replace (title pair)
-                        (replace-regexp-in-string (car pair) (cdr pair) title)))
-      (let* ((pairs `(("[^[:alnum:][:digit:]]" . "-")  ;; convert anything not alphanumeric
-                      ("__*" . "-")  ;; remove sequential underscores
-                      ("^_" . "")  ;; remove starting underscore
-                      ("_$" . "")))  ;; remove ending underscore
-             (slug (-reduce-from #'replace (strip-nonspacing-marks title) pairs)))
-        (s-downcase slug))))
-
-
-  ;;;; Org Roam backlink settings for export
-  ;; see https://org-roam.readthedocs.io/en/latest/org_export/
-  (defun my/org-roam--backlinks-list (file)
-    (if (org-roam--org-roam-file-p file)
-        (--reduce-from
-         (concat acc (format "- [[file:%s][%s]]\n"
-                             (file-relative-name (car it) org-roam-directory)
-                             (org-roam--get-title-or-slug (car it))))
-         "" (org-roam-sql [:select [file-from] :from file-links :where (= file-to $s1)] file))
-      ""))
-  (defun my/org-export-preprocessor (backend)
-    (let ((links (my/org-roam--backlinks-list (buffer-file-name))))
-      (unless (string= links "")
-        (save-excursion
-          (goto-char (point-max))
-          (insert (concat "\n* Backlinks\n") links)))))
-  (add-hook 'org-export-before-processing-hook 'my/org-export-preprocessor)
-
-  ;;;; Org Roam Templating
-  ;; see https://org-roam.readthedocs.io/en/latest/templating/
-  (setq org-roam-capture-templates
-        '(("d" "default" plain (function org-roam--capture-get-point)
-           "%?"
-           :file-name "%<%Y-%m%d-%H%M>-${slug}"
-           :head "#+SETUPFILE:./hugo_setup.org
-#+HUGO_SECTION: zettel
-#+HUGO_SLUG: ${slug}
-#+TITLE: %<%Y-%m%d-%H%M>-${title}\n"
-           :unnarrowed t)
-          ("p" "private" plain (function org-roam--capture-get-point)
-           "%?"
-           :file-name "private-${slug}"
-           :head "#+TITLE: %<%Y-%m%d-%H%M>-${title}\n"
-           :unnarrowed t)))
-  (setq org-roam-ref-capture-templates
-        '(("r" "ref" plain (function org-roam--capture-get-point)
-           "%?"
-           :file-name "websites/${slug}"
-           :head "#+SETUPFILE:./hugo_setup.org
-#+HUGO_SECTION: Weblinks
-#+ROAM_KEY: ${ref}
-#+HUGO_SLUG: ${slug}
-#+TITLE: ${title}
-- source :: ${ref}"
-           :unnarrowed t))))
-
-
-;;; Org Miscellaneous Packages
-
-(use-package htmlize :commands (htmlize-buffer))
-
-(use-package org-inlinetask :ensure nil :commands org-inlinetask-insert-task)
-
- ;; ignore export of headlines marked with :ignore: tag
-(use-package ox-extra
-  :ensure nil
-  :after ox
-  :demand t
-  :config
-  (ox-extras-activate '(ignore-headlines)))
-
-;; Devonthink integration
-(use-package org-devonthink
-  :commands (org-insert-dtp-link org-dtp-store-link)
-  :ensure nil
-  :load-path cpm-elisp-dir)
-
-
-;;; Provide
+;;; End Org Setup
 (provide 'setup-org)

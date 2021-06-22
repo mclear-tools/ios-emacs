@@ -9,7 +9,6 @@
 
 ;;; Projectile
 (use-package projectile
-  :ensure t
   :hook (after-init . projectile-mode)
   :init
   ;; save projectile-known-projects-file in cache folder
@@ -30,6 +29,11 @@
             (concat "rg -0 --files --color=never --hidden" rg-cmd))))
   (setq projectile-git-submodule-command nil
         projectile-current-project-on-switch 'move-to-end))
+  ;; (setq projectile-mode-line-prefix " P:")
+  ;; (setq projectile-dynamic-mode-line t))
+
+  (add-hook 'projectile-after-switch-project-hook (lambda ()
+                                                    (projectile-invalidate-cache nil)))
 
 
 ;;; Eyebrowse
@@ -54,11 +58,11 @@
    "g8" 'eyebrowse-switch-to-window-config-8
    "g9" 'eyebrowse-switch-to-window-config-9)
   (cpm/leader-keys
-   "w." 'hydra-eyebrowse/body
-   "ww" 'eyebrowse-switch-to-window-config
-   "wr" 'eyebrowse-rename-window-config)
+    "w." 'hydra-eyebrowse/body
+    "ww" 'eyebrowse-switch-to-window-config
+    "wr" 'eyebrowse-rename-window-config)
   :config
-  (setq eyebrowse-new-workspace t
+  (setq eyebrowse-new-workspace 'dired-jump
         eyebrowse-mode-line-style 'hide
         eyebrowse-wrap-around t
         eyebrowse-switch-back-and-forth t)
@@ -112,7 +116,6 @@
   ("w" eyebrowse-switch-to-window-config :exit t)
   ("q" nil))
 
-
 ;;; Perspectives
 (use-package persp-mode
   :hook (after-init . persp-mode)
@@ -132,17 +135,17 @@
         persp-remove-buffers-from-nil-persp-behaviour nil
         persp-autokill-persp-when-removed-last-buffer t
         persp-autokill-buffer-on-remove 'kill
-        persp-save-dir (expand-file-name "persp-confs/" cpm-cache-dir)
-        persp-common-buffer-filter-functions
-        (list #'(lambda (b)
-                  "Ignore temporary buffers."
-                  (or (string-prefix-p " " (buffer-name b))
-                      (and (string-prefix-p "*" (buffer-name b))
-                           (not (string-equal "*scratch*" (buffer-name b))))
-                      (string-prefix-p "magit" (buffer-name b))
-                      (string-prefix-p "Pfuture-Callback" (buffer-name b))
-                      (eq (buffer-local-value 'major-mode b) 'nov-mode)
-                      (eq (buffer-local-value 'major-mode b) 'vterm-mode)))))
+        persp-save-dir (expand-file-name "persp-confs/" cpm-cache-dir))
+  ;; persp-common-buffer-filter-functions
+  ;; (list #'(lambda (b)
+  ;;           "Ignore temporary buffers."
+  ;;           (or (string-prefix-p " " (buffer-name b))
+  ;;               (and (string-prefix-p "*" (buffer-name b))
+  ;;                    (not (string-equal "*scratch*" (buffer-name b))))
+  ;;               (string-prefix-p "magit" (buffer-name b))
+  ;;               (string-prefix-p "Pfuture-Callback" (buffer-name b))
+  ;;               (eq (buffer-local-value 'major-mode b) 'nov-mode)
+  ;;               (eq (buffer-local-value 'major-mode b) 'vterm-mode)))))
 
   ;; fix for (void-function make-persp-internal) error
   ;; NOTE: Redefine `persp-add-new' to address.
@@ -150,12 +153,12 @@
   ;; https://github.com/Bad-ptr/persp-mode.el/issues/96
   ;; https://github.com/Bad-ptr/persp-mode-projectile-bridge.el/issues/4
   ;; https://emacs-china.org/t/topic/6416/7
-  (defun* persp-add-new (name &optional (phash *persp-hash*))
+  (cl-defun persp-add-new (name &optional (phash *persp-hash*))
     "Create a new perspective with the given `NAME'. Add it to `PHASH'.
    Return the created perspective."
     (interactive "sA name for the new perspective: ")
     (if (and name (not (equal "" name)))
-        (destructuring-bind (e . p)
+        (cl-destructuring-bind (e . p)
             (persp-by-name-and-exists name phash)
           (if e p
             (setq p (if (equal persp-nil-name name)
@@ -164,29 +167,28 @@
             (run-hook-with-args 'persp-created-functions p phash)
             p))
       (message "[persp-mode] Error: Can't create a perspective with empty name.")
-      nil))
+      nil)))
 
-  ;; Integrate Ivy
-  ;; https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el
-  (with-eval-after-load 'ivy
-    (add-to-list 'ivy-ignore-buffers
-                 #'(lambda (b)
-                     (when persp-mode
-                       (let ((persp (get-current-persp)))
-                         (if persp
-                             (not (persp-contain-buffer-p b persp))
-                           nil)))))
+;; ;; Integrate Ivy
+;; ;; https://gist.github.com/Bad-ptr/1aca1ec54c3bdb2ee80996eb2b68ad2d#file-persp-ivy-el
+;; (with-eval-after-load 'ivy
+;;   (add-to-list 'ivy-ignore-buffers
+;;                #'(lambda (b)
+;;                    (when persp-mode
+;;                      (let ((persp (get-current-persp)))
+;;                        (if persp
+;;                            (not (persp-contain-buffer-p b persp))
+;;                          nil)))))
 
-    (setq ivy-sort-functions-alist
-          (append ivy-sort-functions-alist
-                  '((persp-kill-buffer   . nil)
-                    (persp-remove-buffer . nil)
-                    (persp-add-buffer    . nil)
-                    (persp-switch        . nil)
-                    (persp-window-switch . nil))))))
+;;   (setq ivy-sort-functions-alist
+;;         (append ivy-sort-functions-alist
+;;                 '((persp-kill-buffer   . nil)
+;;                   (persp-remove-buffer . nil)
+;;                   (persp-add-buffer    . nil)
+;;                   (persp-switch        . nil)
+;;                   (persp-window-switch . nil))))))
 
 (use-package persp-mode-projectile-bridge
-  :ensure t
   :after (persp-mode projectile-mode)
   :hook (persp-mode . persp-mode-projectile-bridge-mode)
   :functions (persp-add-new
@@ -205,20 +207,22 @@
   (if (get-buffer "*Org Agenda*")
       (progn
         (persp-switch "agenda")
+        ;; (eyebrowse-switch-to-window-config-1)
         (switch-to-buffer "*Org Agenda*")
-        (delete-other-windows)
-        (eyebrowse-switch-to-window-config-1)
-        (persp-switch "agenda"))
-    (persp-switch "agenda")
-    (setq frame-title-format '("" "%b"))
-    (require 'org-super-agenda)
-    (cpm/jump-to-org-super-agenda)
-    (persp-add-buffer "*Org Agenda*")))
+        (org-agenda-redo)
+        (delete-other-windows))
+    (progn
+      (persp-switch "agenda")
+      ;; (setq frame-title-format '("" "%b"))
+      (require 'org)
+      (require 'org-super-agenda)
+      (cpm/jump-to-org-super-agenda)
+      (persp-add-buffer "*Org Agenda*"))))
 
-  (general-define-key
-   :states '(insert normal motion emacs)
-   :keymaps 'override
-   "s-1" 'cpm/open-agenda-in-workspace)
+(general-define-key
+ :states '(insert normal motion emacs)
+ :keymaps 'override
+ "s-1" 'cpm/open-agenda-in-workspace)
 
 ;;;; Open emacs.d in workspace
 (defun cpm/open-emacsd-in-workspace ()
@@ -226,17 +230,15 @@
   (interactive)
   (if (get-buffer "init.el")
       (persp-switch "emacs.d")
-    (eyebrowse-switch-to-window-config-1)
     (persp-switch "emacs.d")
-    (setq frame-title-format
-          '(""
-            "%b"
-            (:eval
-             (let ((project-name (projectile-project-name)))
-               (unless (string= "-" project-name)
-                 (format " in [%s]" project-name))))))
-    (require 'crux)
-    (crux-find-user-init-file)
+    ;; (setq frame-title-format
+    ;;       '(""
+    ;;         "%b"
+    ;;         (:eval
+    ;;          (let ((project-name (projectile-project-name)))
+    ;;            (unless (string= "-" project-name)
+    ;;              (format " in [%s]" project-name))))))
+    (find-file-other-window user-init-file)
     (require 'magit)
     (magit-status-setup-buffer)))
 
@@ -251,15 +253,14 @@
   (interactive)
   (if (get-buffer "*Deft*")
       (persp-switch "Notes")
-    (eyebrowse-switch-to-window-config-3)
     (persp-switch "Notes")
-    (setq frame-title-format
-          '(""
-            "%b"
-            (:eval
-             (let ((project-name (projectile-project-name)))
-               (unless (string= "-" project-name)
-                 (format " in [%s]" project-name))))))
+    ;; (setq frame-title-format
+    ;;       '(""
+    ;;         "%b"
+    ;;         (:eval
+    ;;          (let ((project-name (projectile-project-name)))
+    ;;            (unless (string= "-" project-name)
+    ;;              (format " in [%s]" project-name))))))
     (cpm/notebook))
   (persp-add-buffer "*Deft*"))
 
@@ -268,6 +269,53 @@
  :keymaps 'override
  "s-3" 'cpm/open-notes-in-workspace)
 
+;;;; Terminal Workspace
+(defun cpm/vterm-home ()
+  (interactive)
+  (let ((default-directory "~/"))
+    (require 'multi-vterm)
+    (multi-vterm-next)))
+
+(defun cpm/open-new-terminal-and-workspace ()
+  "open an empty buffer in its own perspective"
+  (interactive)
+  (if (get-buffer "*vterminal<1>*")
+      (persp-switch "Terminal")
+    (persp-switch "Terminal"))
+  (evil-set-initial-state 'vterm-mode 'insert)
+  (cpm/vterm-home)
+  (delete-other-windows)
+  (persp-add-buffer "*vterminal<1>*")
+  ;; (setq frame-title-format '("" "%b"))
+  )
+
+(general-define-key
+ :states '(insert normal motion emacs)
+ :keymaps 'override
+ "s-4" 'cpm/open-new-terminal-and-workspace)
+
+;;;; Open Mu4e Email in Workspace
+(defun cpm/open-email-in-workspace ()
+  "open agenda in its own perspective"
+  (interactive)
+  (if (get-buffer "*mu4e-main*")
+      (progn
+        (persp-switch "Email")
+        ;; (eyebrowse-switch-to-window-config-1)
+        (switch-to-buffer "*mu4e-main*")
+        (delete-other-windows))
+    (progn
+      (persp-switch "Email")
+      ;; (setq frame-title-format '("" "%b"))
+      (mu4e)
+      (persp-add-buffer "*mu4e-main*"))))
+
+(general-define-key
+ :states '(insert normal motion emacs)
+ :keymaps 'override
+ "s-5" 'cpm/open-email-in-workspace)
+
+
 ;;;; Open New Buffer in Workspace
 ;; This function is a bit weird; It creates a new buffer in a new workspace with a
 ;; dummy git project to give the isolation of buffers typical with a git project
@@ -275,7 +323,7 @@
 (defun cpm/open-new-buffer-and-workspace ()
   "open an empty buffer in its own perspective"
   (interactive)
-  (eyebrowse-switch-to-window-config-1)
+  (eyebrowse-switch-to-window-config-0)
   (persp-switch "new-persp")
   (let ((cpm-project-temp-dir "/tmp/temp-projects/"))
     (progn
@@ -288,23 +336,23 @@
     (setq default-directory cpm-project-temp-dir)
     (find-file (concat cpm-project-temp-dir "temp"))
     (persp-add-buffer "*scratch*")
-    (setq frame-title-format '("" "%b"))))
+    ;; (setq frame-title-format '("" "%b")))
+    ))
 
 
 ;;;; Open Project in New Workspace
 (defun cpm/open-existing-project-and-workspace ()
   "open a project as its own perspective"
   (interactive)
-  (eyebrowse-switch-to-window-config-1)
   (persp-switch "new-persp")
-  (counsel-projectile-switch-project)
-  (setq frame-title-format
-        '(""
-          "%b"
-          (:eval
-           (let ((project-name (projectile-project-name)))
-             (unless (string= "-" project-name)
-               (format " in [%s]" project-name))))))
+  (projectile-switch-project)
+  ;; (setq frame-title-format
+  ;;       '(""
+  ;;         "%b"
+  ;;         (:eval
+  ;;          (let ((project-name (projectile-project-name)))
+  ;;            (unless (string= "-" project-name)
+  ;;              (format " in [%s]" project-name))))))
   ;; (eyebrowse-rename-window-config (eyebrowse--get 'current-slot) (projectile-project-name))
   (require 'magit)
   (magit-status-setup-buffer)
@@ -316,16 +364,16 @@
 (defun cpm/create-new-project-and-workspace ()
   "create & open a project as its own perspective"
   (interactive)
-  (eyebrowse-switch-to-window-config-1)
+  ;; (eyebrowse-switch-to-window-config-1)
   (persp-switch "new-project")
   (cpm/git-new-project)
-  (setq frame-title-format
-        '(""
-          "%b"
-          (:eval
-           (let ((project-name (projectile-project-name)))
-             (unless (string= "-" project-name)
-               (format " in [%s]" project-name))))))
+  ;; (setq frame-title-format
+  ;;       '(""
+  ;;         "%b"
+  ;;         (:eval
+  ;;          (let ((project-name (projectile-project-name)))
+  ;;            (unless (string= "-" project-name)
+  ;;              (format " in [%s]" project-name))))))
   ;; (eyebrowse-rename-window-config (eyebrowse--get 'current-slot) (projectile-project-name))
   (delete-other-windows)
   (find-file ".gitignore")
